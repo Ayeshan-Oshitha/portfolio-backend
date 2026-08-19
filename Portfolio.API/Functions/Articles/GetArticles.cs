@@ -14,8 +14,8 @@ public class GetArticles
         _logger = logger;
     }
 
-    [Function("GetArticlesV1")]
-    public IActionResult Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/articles")] HttpRequest req)
+    [Function("GetPublicArticles")]
+    public IActionResult Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "public/articles")] HttpRequest req)
     {
         var articles = new List<object>
         {
