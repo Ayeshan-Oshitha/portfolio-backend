@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http;
 
+using Portfolio.API.Enums;
+
 namespace Portfolio.API.Common;
 
 /// <summary>Query string parsing shared by every list endpoint.</summary>
@@ -55,4 +57,12 @@ public static class QueryParameters
 
         return false;
     }
+
+    /// <summary>
+    /// Reads the mandatory <c>?site=</c>. <c>false</c> means the value was present but not a known
+    /// site; a null <paramref name="site"/> alongside <c>true</c> means it was absent altogether,
+    /// which the caller answers with <see cref="ProblemResults.SiteRequired"/>.
+    /// </summary>
+    public static bool TryReadSite(HttpRequest request, out Site? site) =>
+        TryReadEnum(request, "site", out site);
 }
