@@ -20,6 +20,13 @@ public static class ProblemResults
     public static IActionResult Conflict(string code, string detail) =>
         Create(StatusCodes.Status409Conflict, "Conflict", code, detail);
 
+    /// <summary>
+    /// The guard that stops personal content leaking onto the agency site: a public endpoint with
+    /// site visibility never falls back to "return everything".
+    /// </summary>
+    public static IActionResult SiteRequired() =>
+        BadRequest("site_required", "?site=agency or ?site=personal is required.");
+
     /// <summary>Maps a service failure onto the matching status code.</summary>
     public static IActionResult FromError(ServiceError error) => error.Kind switch
     {

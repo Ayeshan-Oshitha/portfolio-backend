@@ -52,5 +52,6 @@ builder.Services.Configure<JsonOptions>(options =>
 });
 
 builder.Services.AddScoped<ITagService, TagService>();
+builder.Services.AddScoped<IArticleService, ArticleService>();
 
 builder.Build().Run();
