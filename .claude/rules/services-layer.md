@@ -32,6 +32,7 @@ DTO → return. No EF Core queries in a Function.
   slug changes.
 - `medium_url` is required on articles and must be an absolute URL.
 - `price_amount = null` is valid and means "Custom / Contact us" — don't default it to 0.
+- A tag may not be deleted while a project or article still references it — `tag_in_use`.
 - Public read paths always apply `is_published`, `is_deleted`, and the site flag. Never expose a
   service method that lets a caller skip those filters on the public surface.
 
