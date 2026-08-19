@@ -1,0 +1,60 @@
+using System.Text.Json;
+
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Functions.Worker;
+
+using Portfolio.API.Common;
+using Portfolio.API.DTOs.Admin;
+using Portfolio.API.Interfaces;
+
+namespace Portfolio.API.Functions.Projects;
+
+public class ReorderProjectImages
+{
+    private readonly IProjectService _projectService;
+
+    public ReorderProjectImages(IProjectService projectService)
+    {
+        _projectService = projectService;
+    }
+
+    /// <summary>
+    /// Bulk sort_order update for one gallery. No site here — a project has a single image order.
+    /// </summary>
+    [Function("ReorderProjectImages")]
+    public async Task<IActionResult> Run(
+        [HttpTrigger(
+            AuthorizationLevel.Anonymous,
+            "post",
+            Route = "admin/projects/{id:guid}/images/reorder")] HttpRequest req,
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        HttpResponses.MarkNoStore(req);
+
+        ImageReorderRequest? body;
+        try
+        {
+            body = await JsonSerializer.DeserializeAsync<ImageReorderRequest>(
+                req.Body,
+                JsonDefaults.Options,
+                cancellationToken);
+        }
+        catch (JsonException ex)
+        {
+            return ProblemResults.BadRequest("validation_failed", ex.Message);
+        }
+
+        if (body is null)
+        {
+            return ProblemResults.BadRequest("validation_failed", "A request body is required.");
+        }
+
+        var result = await _projectService.ReorderImagesAsync(id, body, cancellationToken);
+
+        return result.IsSuccess
+            ? new NoContentResult()
+            : ProblemResults.FromError(result.Error!);
+    }
+}
