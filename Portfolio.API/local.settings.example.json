@@ -2,7 +2,11 @@
   "IsEncrypted": false,
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "Jwt__Signer": "<a-long-random-secret-at-least-32-chars>",
+    "Jwt__Issuer": "portfolio-api",
+    "Jwt__Audience": "portfolio-admin",
+    "Jwt__AccessTokenMinutes": "480"
   },
   "ConnectionStrings": {
     "Default": "Host=<neon-pooled-host>;Database=<db>;Username=<user>;Password=<password>;SslMode=Require;Maximum Pool Size=8;Timeout=15;Command Timeout=30"

@@ -14,7 +14,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasKey(u => u.Id);
         builder.Property(u => u.Id).HasColumnName("id");
         builder.Property(u => u.Email).HasColumnName("email").HasColumnType("citext").IsRequired();
-        builder.Property(u => u.FullName).HasColumnName("full_name").IsRequired();
+        builder.Property(u => u.FirstName).HasColumnName("first_name").IsRequired();
+        builder.Property(u => u.LastName).HasColumnName("last_name").IsRequired();
         builder.Property(u => u.PasswordHash).HasColumnName("password_hash");
         builder.Property(u => u.GoogleSubjectId).HasColumnName("google_subject_id");
         builder.Property(u => u.AvatarUrl).HasColumnName("avatar_url");

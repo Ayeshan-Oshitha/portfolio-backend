@@ -9,7 +9,9 @@ public class User : AuditableEntity
     /// <summary>Stored as <c>citext</c> so lookups are case-insensitive.</summary>
     public required string Email { get; set; }
 
-    public required string FullName { get; set; }
+    public required string FirstName { get; set; }
+
+    public required string LastName { get; set; }
 
     /// <summary>Null for Google-only accounts.</summary>
     public string? PasswordHash { get; set; }

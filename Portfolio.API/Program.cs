@@ -8,10 +8,12 @@ using Microsoft.Extensions.Hosting;
 
 using Npgsql;
 
+using Portfolio.API.Auth;
 using Portfolio.API.Common;
 using Portfolio.API.Data;
 using Portfolio.API.Enums;
 using Portfolio.API.Interfaces;
+using Portfolio.API.Middleware;
 using Portfolio.API.Services;
 
 var builder = FunctionsApplication.CreateBuilder(args);
@@ -56,5 +58,13 @@ builder.Services.AddScoped<IArticleService, ArticleService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
 builder.Services.AddScoped<IPricingService, PricingService>();
+
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<CurrentUser>();
+builder.Services.AddScoped<IUserService, UserService>();
+
+// Everything under /api/admin/* is authorised here, not per function.
+builder.UseMiddleware<JwtAuthenticationMiddleware>();
 
 builder.Build().Run();
