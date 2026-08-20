@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using Npgsql;
 
@@ -60,6 +62,7 @@ builder.Services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
 builder.Services.AddScoped<IPricingService, PricingService>();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<SuperAdminOptions>(builder.Configuration.GetSection("SuperAdmin"));
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<CurrentUser>();
 builder.Services.AddScoped<IUserService, UserService>();
@@ -67,4 +70,28 @@ builder.Services.AddScoped<IUserService, UserService>();
 // Everything under /api/admin/* is authorised here, not per function.
 builder.UseMiddleware<JwtAuthenticationMiddleware>();
 
-builder.Build().Run();
+var host = builder.Build();
+
+// The one account that is never created through the API. Schema changes still belong in
+// migrations run from CI — this only writes the row, and is safe to repeat on every cold start.
+await using (var scope = host.Services.CreateAsyncScope())
+{
+    var logger = scope.ServiceProvider
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger(nameof(SuperAdminSeeder));
+
+    try
+    {
+        await SuperAdminSeeder.EnsureSeededAsync(
+            scope.ServiceProvider.GetRequiredService<PortfolioDbContext>(),
+            scope.ServiceProvider.GetRequiredService<IOptions<SuperAdminOptions>>().Value,
+            logger);
+    }
+    catch (Exception ex)
+    {
+        // A transient Neon failure must not stop the host from serving the public sites.
+        logger.LogError(ex, "Super admin seeding failed. The host is starting anyway.");
+    }
+}
+
+host.Run();

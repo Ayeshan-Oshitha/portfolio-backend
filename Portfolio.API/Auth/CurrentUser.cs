@@ -16,4 +16,7 @@ public sealed class CurrentUser
     public UserRole? Role { get; set; }
 
     public bool IsAuthenticated => UserId is not null;
+
+    /// <summary>Only the super admin may approve, reject, disable or delete users — see auth.md.</summary>
+    public bool IsSuperAdmin => Role == UserRole.SuperAdmin;
 }

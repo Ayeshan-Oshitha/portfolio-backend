@@ -30,6 +30,15 @@ Google sign-in for an email with no user row creates a **`pending`** user. Never
 Claims: `sub`, `email`, `role`, `jti`. Validate on every `/api/admin/*` call in a **Functions
 middleware**, not per-function.
 
+Refresh tokens **rotate**: each refresh revokes the presented token and issues a new one. A
+revoked token presented again is treated as theft — every live token for that user is revoked and
+the call fails with `refresh_token_reused`.
+
+A JWT cannot be recalled once issued, so revocation is what actually bounds access: disable,
+reject, delete and change-password all revoke that user's refresh tokens, which caps their
+remaining access at one access-token lifetime (15 min). Refresh also re-checks `status`, so a
+disabled user cannot renew.
+
 Function-level `AuthorizationLevel` is set to `Anonymous` everywhere; function keys are not an
 auth system. Authorization is the middleware's job.
 

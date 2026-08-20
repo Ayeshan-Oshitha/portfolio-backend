@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 using Portfolio.API.Auth;
 using Portfolio.API.Common;
@@ -16,6 +17,8 @@ public class UserService : IUserService
 {
     private const int MinimumPasswordLength = 8;
 
+    private const string SuperAdminOnly = "Only the super admin can manage users.";
+
     private static readonly Expression<Func<User, AdminUserResponse>> AdminProjection = user =>
         new AdminUserResponse
         {
@@ -26,21 +29,31 @@ public class UserService : IUserService
             Role = user.Role,
             Status = user.Status,
             LastLoginAt = user.LastLoginAt,
+            ApprovedAt = user.ApprovedAt,
+            RejectionReason = user.RejectionReason,
             CreatedAt = user.CreatedAt
         };
+
+    private static readonly Func<User, AdminUserResponse> ToResponse = AdminProjection.Compile();
 
     private readonly PortfolioDbContext _db;
     private readonly IJwtTokenService _tokens;
     private readonly CurrentUser _currentUser;
+    private readonly JwtOptions _jwtOptions;
 
-    public UserService(PortfolioDbContext db, IJwtTokenService tokens, CurrentUser currentUser)
+    public UserService(
+        PortfolioDbContext db,
+        IJwtTokenService tokens,
+        CurrentUser currentUser,
+        IOptions<JwtOptions> jwtOptions)
     {
         _db = db;
         _tokens = tokens;
         _currentUser = currentUser;
+        _jwtOptions = jwtOptions.Value;
     }
 
-    public async Task<ServiceResult<AuthResponse>> RegisterAsync(
+    public async Task<ServiceResult<AdminUserResponse>> RegisterAsync(
         RegisterRequest request,
         CancellationToken cancellationToken)
     {
@@ -51,13 +64,18 @@ public class UserService : IUserService
         var validationError = ValidateRegistration(firstName, lastName, email, request);
         if (validationError is not null)
         {
-            return ServiceResult<AuthResponse>.Validation(validationError);
+            return ServiceResult<AdminUserResponse>.Validation(validationError);
         }
 
-        var emailTaken = await _db.Users.AnyAsync(u => u.Email == email, cancellationToken);
+        // Ignoring the soft-delete filter: a deleted account still owns its email address.
+        var emailTaken = await _db.Users
+            .IgnoreQueryFilters()
+            .AnyAsync(u => u.Email == email, cancellationToken);
+
         if (emailTaken)
         {
-            return ServiceResult<AuthResponse>.Conflict("email_taken", "That email address is already registered.");
+            return ServiceResult<AdminUserResponse>.Conflict(
+                "email_taken", "That email address is already registered.");
         }
 
         var user = new User
@@ -66,16 +84,15 @@ public class UserService : IUserService
             FirstName = firstName!,
             LastName = lastName!,
             PasswordHash = PasswordHasher.Hash(request.Password!),
-            // No approval workflow yet: whoever registers can use the CMS immediately.
+            // Registration is open but powerless: no token until the super admin approves.
             Role = UserRole.Admin,
-            Status = UserStatus.Approved,
-            LastLoginAt = DateTimeOffset.UtcNow
+            Status = UserStatus.Pending
         };
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult<AuthResponse>.Success(IssueToken(user));
+        return ServiceResult<AdminUserResponse>.Success(ToResponse(user));
     }
 
     public async Task<ServiceResult<AuthResponse>> LoginAsync(
@@ -106,17 +123,96 @@ public class UserService : IUserService
             return InvalidCredentials();
         }
 
+        // Checked after the password so an anonymous caller cannot probe account state.
+        // A non-approved user is rejected here at token issue rather than handed a scopeless token.
         if (user.Status != UserStatus.Approved)
         {
-            return ServiceResult<AuthResponse>.Forbidden(
-                "account_disabled",
-                "This account cannot sign in. Contact an administrator.");
+            return NotApproved(user);
         }
 
         user.LastLoginAt = DateTimeOffset.UtcNow;
+
+        var (response, _) = await IssueTokensAsync(user, cancellationToken);
+
+        return ServiceResult<AuthResponse>.Success(response);
+    }
+
+    public async Task<ServiceResult<AuthResponse>> RefreshAsync(
+        RefreshTokenRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (Blank(request.RefreshToken) is not { } presented)
+        {
+            return ServiceResult<AuthResponse>.Validation("A refresh token is required.");
+        }
+
+        var hash = RefreshTokenGenerator.Hash(presented);
+
+        // IgnoreQueryFilters so a soft-deleted owner still loads — the User navigation would
+        // otherwise come back null and the account checks below would never run.
+        var stored = await _db.RefreshTokens
+            .IgnoreQueryFilters()
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken);
+
+        if (stored is null)
+        {
+            return InvalidRefreshToken();
+        }
+
+        if (stored.RevokedAt is not null)
+        {
+            // A revoked token coming back means it was replayed — most likely stolen, since the
+            // legitimate client would be holding its replacement. Kill the whole family rather
+            // than just this one.
+            await RevokeAllForUserAsync(stored.UserId, cancellationToken);
+
+            return ServiceResult<AuthResponse>.Unauthorized(
+                "refresh_token_reused",
+                "This refresh token was already used. All sessions have been signed out.");
+        }
+
+        if (stored.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return ServiceResult<AuthResponse>.Unauthorized(
+                "refresh_token_expired", "This refresh token has expired. Sign in again.");
+        }
+
+        // The check that bounds a revoked user's access: they cannot renew, whatever their old
+        // access token still says.
+        if (stored.User.Status != UserStatus.Approved || stored.User.IsDeleted)
+        {
+            await RevokeAllForUserAsync(stored.UserId, cancellationToken);
+
+            return NotApproved(stored.User);
+        }
+
+        var (issued, replacement) = await IssueTokensAsync(stored.User, cancellationToken);
+
+        stored.RevokedAt = DateTimeOffset.UtcNow;
+        stored.ReplacedByTokenId = replacement.Id;
+
         await _db.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult<AuthResponse>.Success(IssueToken(user));
+        return ServiceResult<AuthResponse>.Success(issued);
+    }
+
+    public async Task<ServiceResult<bool>> LogoutAsync(
+        RefreshTokenRequest request,
+        CancellationToken cancellationToken)
+    {
+        // No error for an unknown token: signing out is not a way to discover which tokens exist.
+        if (Blank(request.RefreshToken) is { } presented)
+        {
+            var hash = RefreshTokenGenerator.Hash(presented);
+
+            await _db.RefreshTokens
+                .Where(t => t.TokenHash == hash && t.RevokedAt == null)
+                .ExecuteUpdateAsync(
+                    t => t.SetProperty(x => x.RevokedAt, DateTimeOffset.UtcNow), cancellationToken);
+        }
+
+        return ServiceResult<bool>.Success(true);
     }
 
     public async Task<ServiceResult<AdminUserResponse>> GetMeAsync(CancellationToken cancellationToken)
@@ -167,16 +263,30 @@ public class UserService : IUserService
         user.PasswordHash = PasswordHasher.Hash(request.NewPassword!);
         await _db.SaveChangesAsync(cancellationToken);
 
+        // Changing a password signs out everywhere else, including whoever prompted the change.
+        await RevokeAllForUserAsync(userId, cancellationToken);
+
         return ServiceResult<bool>.Success(true);
     }
 
-    public async Task<PagedResult<AdminUserResponse>> GetAllAsync(
+    public async Task<ServiceResult<PagedResult<AdminUserResponse>>> GetAllAsync(
         string? search,
+        UserStatus? status,
         int page,
         int pageSize,
         CancellationToken cancellationToken)
     {
+        if (RequireSuperAdmin<PagedResult<AdminUserResponse>>() is { } denied)
+        {
+            return denied;
+        }
+
         var query = _db.Users.AsNoTracking();
+
+        if (status is { } wanted)
+        {
+            query = query.Where(u => u.Status == wanted);
+        }
 
         if (Blank(search) is { } term)
         {
@@ -196,58 +306,197 @@ public class UserService : IUserService
             .Select(AdminProjection)
             .ToListAsync(cancellationToken);
 
-        return new PagedResult<AdminUserResponse>
+        return ServiceResult<PagedResult<AdminUserResponse>>.Success(new PagedResult<AdminUserResponse>
         {
             Items = items,
             Page = page,
             PageSize = pageSize,
             Total = total
-        };
+        });
+    }
+
+    public async Task<ServiceResult<AdminUserResponse>> ApproveAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var loaded = await LoadManageableUserAsync(id, cancellationToken);
+        if (!loaded.IsSuccess)
+        {
+            return ServiceResult<AdminUserResponse>.Failure(loaded.Error!);
+        }
+
+        var user = loaded.Value!;
+
+        user.Status = UserStatus.Approved;
+        user.ApprovedBy = _currentUser.UserId;
+        user.ApprovedAt = DateTimeOffset.UtcNow;
+        user.RejectionReason = null;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult<AdminUserResponse>.Success(ToResponse(user));
+    }
+
+    public async Task<ServiceResult<AdminUserResponse>> RejectAsync(
+        Guid id,
+        RejectUserRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (Blank(request.Reason) is not { } reason)
+        {
+            return ServiceResult<AdminUserResponse>.Validation("A rejection reason is required.");
+        }
+
+        var loaded = await LoadManageableUserAsync(id, cancellationToken);
+        if (!loaded.IsSuccess)
+        {
+            return ServiceResult<AdminUserResponse>.Failure(loaded.Error!);
+        }
+
+        var user = loaded.Value!;
+
+        user.Status = UserStatus.Rejected;
+        user.RejectionReason = reason;
+        user.ApprovedBy = null;
+        user.ApprovedAt = null;
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await RevokeAllForUserAsync(user.Id, cancellationToken);
+
+        return ServiceResult<AdminUserResponse>.Success(ToResponse(user));
+    }
+
+    public async Task<ServiceResult<AdminUserResponse>> DisableAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var loaded = await LoadManageableUserAsync(id, cancellationToken);
+        if (!loaded.IsSuccess)
+        {
+            return ServiceResult<AdminUserResponse>.Failure(loaded.Error!);
+        }
+
+        var user = loaded.Value!;
+
+        user.Status = UserStatus.Disabled;
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await RevokeAllForUserAsync(user.Id, cancellationToken);
+
+        return ServiceResult<AdminUserResponse>.Success(ToResponse(user));
     }
 
     public async Task<ServiceResult<bool>> DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
+        var loaded = await LoadManageableUserAsync(id, cancellationToken);
+        if (!loaded.IsSuccess)
+        {
+            return ServiceResult<bool>.Failure(loaded.Error!);
+        }
+
+        loaded.Value!.IsDeleted = true;
+        await _db.SaveChangesAsync(cancellationToken);
+        await RevokeAllForUserAsync(loaded.Value.Id, cancellationToken);
+
+        return ServiceResult<bool>.Success(true);
+    }
+
+    /// <summary>
+    /// The guard every management method shares: super admin only, and the super admin's own row is
+    /// off limits so the CMS cannot be locked out of itself.
+    /// </summary>
+    private async Task<ServiceResult<User>> LoadManageableUserAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (RequireSuperAdmin<User>() is { } denied)
+        {
+            return denied;
+        }
+
         if (_currentUser.UserId == id)
         {
-            return ServiceResult<bool>.Conflict("cannot_delete_self", "You cannot delete your own account.");
+            return ServiceResult<User>.Conflict(
+                "cannot_modify_self", "You cannot change your own account this way.");
         }
 
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
         if (user is null)
         {
-            return ServiceResult<bool>.NotFound("user_not_found", "No user with that id.");
+            return ServiceResult<User>.NotFound("user_not_found", "No user with that id.");
         }
 
-        user.IsDeleted = true;
+        if (user.Role == UserRole.SuperAdmin)
+        {
+            return ServiceResult<User>.Conflict(
+                "cannot_modify_super_admin", "The super admin account cannot be changed here.");
+        }
+
+        return ServiceResult<User>.Success(user);
+    }
+
+    private ServiceResult<T>? RequireSuperAdmin<T>() =>
+        _currentUser.IsSuperAdmin ? null : ServiceResult<T>.Forbidden("forbidden", SuperAdminOnly);
+
+    /// <summary>
+    /// Issues the access token and a fresh refresh token, storing only the refresh token's hash.
+    /// Expired rows for the same user are swept here, which is why no timer function is needed.
+    /// </summary>
+    private async Task<(AuthResponse Response, RefreshToken Row)> IssueTokensAsync(
+        User user,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var (accessToken, expiresAt) = _tokens.CreateAccessToken(user);
+
+        var refreshToken = RefreshTokenGenerator.Create();
+        var refreshExpiresAt = now.AddDays(_jwtOptions.RefreshTokenDays);
+
+        var row = new RefreshToken
+        {
+            UserId = user.Id,
+            TokenHash = RefreshTokenGenerator.Hash(refreshToken),
+            ExpiresAt = refreshExpiresAt,
+            CreatedAt = now
+        };
+
+        _db.RefreshTokens.Add(row);
+
+        await _db.RefreshTokens
+            .Where(t => t.UserId == user.Id && t.ExpiresAt < now)
+            .ExecuteDeleteAsync(cancellationToken);
+
         await _db.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult<bool>.Success(true);
-    }
-
-    private AuthResponse IssueToken(User user)
-    {
-        var (token, expiresAt) = _tokens.CreateAccessToken(user);
-
-        return new AuthResponse
+        return (new AuthResponse
         {
-            AccessToken = token,
+            AccessToken = accessToken,
             ExpiresAt = expiresAt,
-            User = new AdminUserResponse
-            {
-                Id = user.Id,
-                Email = user.Email,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                Role = user.Role,
-                Status = user.Status,
-                LastLoginAt = user.LastLoginAt,
-                CreatedAt = user.CreatedAt
-            }
-        };
+            RefreshToken = refreshToken,
+            RefreshTokenExpiresAt = refreshExpiresAt,
+            User = ToResponse(user)
+        }, row);
     }
+
+    /// <summary>
+    /// Kills every live session for a user. Called when the password changes and whenever the super
+    /// admin takes access away — without it a revoked user keeps renewing for another 30 days.
+    /// </summary>
+    private Task RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken) =>
+        _db.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(t => t.SetProperty(x => x.RevokedAt, DateTimeOffset.UtcNow), cancellationToken);
 
     private static ServiceResult<AuthResponse> InvalidCredentials() =>
         ServiceResult<AuthResponse>.Unauthorized("invalid_credentials", "Incorrect email or password.");
+
+    private static ServiceResult<AuthResponse> InvalidRefreshToken() =>
+        ServiceResult<AuthResponse>.Unauthorized("invalid_refresh_token", "This refresh token is not valid.");
+
+    /// <summary>Shared by login and refresh, so both surfaces report account state identically.</summary>
+    private static ServiceResult<AuthResponse> NotApproved(User user) => user.Status switch
+    {
+        UserStatus.Pending => ServiceResult<AuthResponse>.Forbidden(
+            "account_pending", "This account is waiting for super admin approval."),
+        UserStatus.Rejected => ServiceResult<AuthResponse>.Forbidden(
+            "account_rejected", user.RejectionReason ?? "This account was rejected."),
+        _ => ServiceResult<AuthResponse>.Forbidden(
+            "account_disabled", "This account has been disabled. Contact the super admin.")
+    };
 
     private static string? ValidateRegistration(
         string? firstName,

@@ -19,5 +19,10 @@ public sealed class AdminUserResponse
 
     public DateTimeOffset? LastLoginAt { get; init; }
 
+    public DateTimeOffset? ApprovedAt { get; init; }
+
+    /// <summary>Set only on a rejected account, so the admin SPA can show why.</summary>
+    public string? RejectionReason { get; init; }
+
     public required DateTimeOffset CreatedAt { get; init; }
 }

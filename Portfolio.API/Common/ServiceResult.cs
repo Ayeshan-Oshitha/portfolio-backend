@@ -32,6 +32,9 @@ public sealed class ServiceResult<T>
 
     public static ServiceResult<T> Success(T value) => new(value, null);
 
+    /// <summary>Carries a failure from an inner call outward without flattening its kind.</summary>
+    public static ServiceResult<T> Failure(ServiceError error) => new(default, error);
+
     public static ServiceResult<T> NotFound(string code, string message) =>
         new(default, new ServiceError(ServiceErrorKind.NotFound, code, message));
 
