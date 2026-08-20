@@ -49,11 +49,14 @@ site: featured projects, featured articles, featured services, featured pricing 
 POST   /api/admin/auth/login            # email + password
 POST   /api/admin/auth/google           # Google ID token exchange
 POST   /api/admin/auth/register
-POST   /api/admin/auth/refresh
+POST   /api/admin/auth/refresh         # body { refreshToken }, rotates
+POST   /api/admin/auth/logout          # body { refreshToken }, revokes it
 
-GET    /api/admin/users                 # super_admin only
+GET    /api/admin/users                 # super_admin only, ?search= &status=
 POST   /api/admin/users/{id}/approve    # super_admin only
-POST   /api/admin/users/{id}/reject     # super_admin only
+POST   /api/admin/users/{id}/reject     # super_admin only, body { reason }
+POST   /api/admin/users/{id}/disable    # super_admin only
+DELETE /api/admin/users/{id}            # super_admin only, soft delete
 
 CRUD   /api/admin/projects              # + /{id}/images, /{id}/images/reorder
 CRUD   /api/admin/articles

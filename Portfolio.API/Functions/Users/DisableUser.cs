@@ -7,31 +7,28 @@ using Portfolio.API.Interfaces;
 
 namespace Portfolio.API.Functions.Users;
 
-public class DeleteUser
+public class DisableUser
 {
     private readonly IUserService _users;
 
-    public DeleteUser(IUserService users)
+    public DisableUser(IUserService users)
     {
         _users = users;
     }
 
-    /// <summary>
-    /// Super admin only, soft delete. Deleting yourself or the super admin row is refused so the
-    /// CMS cannot be locked out.
-    /// </summary>
-    [Function("DeleteUser")]
+    /// <summary>Super admin only. Revokes access without deleting the account or its audit trail.</summary>
+    [Function("DisableUser")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "admin/users/{id:guid}")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/users/{id:guid}/disable")] HttpRequest req,
         Guid id,
         CancellationToken cancellationToken)
     {
         HttpResponses.MarkNoStore(req);
 
-        var result = await _users.DeleteAsync(id, cancellationToken);
+        var result = await _users.DisableAsync(id, cancellationToken);
 
         return result.IsSuccess
-            ? new NoContentResult()
+            ? new OkObjectResult(result.Value)
             : ProblemResults.FromError(result.Error!);
     }
 }

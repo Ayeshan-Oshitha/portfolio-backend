@@ -10,30 +10,30 @@ using Portfolio.API.Interfaces;
 
 namespace Portfolio.API.Functions.Auth;
 
-public class Register
+public class Refresh
 {
     private readonly IUserService _users;
 
-    public Register(IUserService users)
+    public Refresh(IUserService users)
     {
         _users = users;
     }
 
     /// <summary>
-    /// Anonymous by design — see the allow-list in <c>JwtAuthenticationMiddleware</c>. Creates a
-    /// <c>pending</c> account and deliberately returns no token: the super admin approves first.
+    /// Anonymous by design — this has to work precisely because the access token has expired. See
+    /// the allow-list in <c>JwtAuthenticationMiddleware</c>.
     /// </summary>
-    [Function("Register")]
+    [Function("Refresh")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/auth/register")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/auth/refresh")] HttpRequest req,
         CancellationToken cancellationToken)
     {
         HttpResponses.MarkNoStore(req);
 
-        RegisterRequest? body;
+        RefreshTokenRequest? body;
         try
         {
-            body = await JsonSerializer.DeserializeAsync<RegisterRequest>(
+            body = await JsonSerializer.DeserializeAsync<RefreshTokenRequest>(
                 req.Body, JsonDefaults.Options, cancellationToken);
         }
         catch (JsonException ex)
@@ -44,10 +44,10 @@ public class Register
         if (body is null)
             return ProblemResults.BadRequest("validation_failed", "A request body is required.");
 
-        var result = await _users.RegisterAsync(body, cancellationToken);
-        if (!result.IsSuccess)
-            return ProblemResults.FromError(result.Error!);
+        var result = await _users.RefreshAsync(body, cancellationToken);
 
-        return new ObjectResult(result.Value) { StatusCode = StatusCodes.Status201Created };
+        return result.IsSuccess
+            ? new OkObjectResult(result.Value)
+            : ProblemResults.FromError(result.Error!);
     }
 }

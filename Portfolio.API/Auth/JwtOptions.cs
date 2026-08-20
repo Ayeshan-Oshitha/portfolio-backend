@@ -10,6 +10,11 @@ public sealed class JwtOptions
 
     public string Audience { get; set; } = "portfolio-admin";
 
-    /// <summary>No refresh token yet, so the access token has to last a working session.</summary>
-    public int AccessTokenMinutes { get; set; } = 480;
+    /// <summary>
+    /// Short on purpose: this is the window in which a disabled or deleted user can still act,
+    /// because a JWT cannot be recalled once issued. The SPA renews silently via the refresh token.
+    /// </summary>
+    public int AccessTokenMinutes { get; set; } = 15;
+
+    public int RefreshTokenDays { get; set; } = 30;
 }

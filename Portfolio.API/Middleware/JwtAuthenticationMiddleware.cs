@@ -26,7 +26,10 @@ public sealed class JwtAuthenticationMiddleware : IFunctionsWorkerMiddleware
     private static readonly string[] AnonymousAdminPaths =
     [
         "/admin/auth/register",
-        "/admin/auth/login"
+        "/admin/auth/login",
+        // Both must work with a dead access token — that is the whole point of them.
+        "/admin/auth/refresh",
+        "/admin/auth/logout"
     ];
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
