@@ -5,7 +5,9 @@ public enum ServiceErrorKind
 {
     NotFound,
     Validation,
-    Conflict
+    Conflict,
+    Unauthorized,
+    Forbidden
 }
 
 /// <param name="Code">Stable machine-readable code, e.g. <c>slug_taken</c>.</param>
@@ -35,6 +37,12 @@ public sealed class ServiceResult<T>
 
     public static ServiceResult<T> Validation(string message) =>
         new(default, new ServiceError(ServiceErrorKind.Validation, "validation_failed", message));
+
+    public static ServiceResult<T> Unauthorized(string code, string message) =>
+        new(default, new ServiceError(ServiceErrorKind.Unauthorized, code, message));
+
+    public static ServiceResult<T> Forbidden(string code, string message) =>
+        new(default, new ServiceError(ServiceErrorKind.Forbidden, code, message));
 
     public static ServiceResult<T> Conflict(string code, string message) =>
         new(default, new ServiceError(ServiceErrorKind.Conflict, code, message));
