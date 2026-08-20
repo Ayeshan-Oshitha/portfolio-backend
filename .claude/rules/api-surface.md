@@ -21,7 +21,8 @@ GET /api/public/projects/{slug}
 GET /api/public/articles?site=&tag=&featured=
 GET /api/public/services?site=&featured=
 GET /api/public/services/{slug}
-GET /api/public/pricing?site=&serviceId=          # omit serviceId for combo packs
+GET /api/public/pricing/combos?site=&featured=            # plans with no owning service
+GET /api/public/pricing/services/{serviceId}?site=       # that service's tiers
 GET /api/public/faqs?site=&category=
 GET /api/public/tags?isTechnology=&category=
 GET /api/public/home?site=agency|personal
@@ -29,6 +30,11 @@ GET /api/public/home?site=agency|personal
 
 `?site=` is **required** wherever site visibility applies. A missing `site` is a `400` with code
 `site_required` — never "return everything".
+
+Pricing is two routes, not one with an optional `serviceId`. Absence of a query parameter must
+never silently change the `where` clause — combo packs (`service_id is null`) and a service's
+tiers (`service_id = @id`) are different questions, so they get different URLs. The admin list
+keeps both as explicit filters: `?serviceId=` and `?comboOnly=true`, defaulting to everything.
 
 Public endpoints return only rows where `is_published = true`, `is_deleted = false`, and the
 matching `show_on_{site}` flag is true. Order by that site's `sort_order`, then by

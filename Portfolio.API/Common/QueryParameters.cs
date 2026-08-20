@@ -23,6 +23,10 @@ public static class QueryParameters
     public static bool? ReadBool(HttpRequest request, string name) =>
         bool.TryParse(request.Query[name], out var value) ? value : null;
 
+    /// <summary>Null when the parameter is absent or not a Guid.</summary>
+    public static Guid? ReadGuid(HttpRequest request, string name) =>
+        Guid.TryParse(request.Query[name], out var value) ? value : null;
+
     public static int? ReadInt(HttpRequest request, string name) =>
         int.TryParse(request.Query[name], out var value) ? value : null;
 
