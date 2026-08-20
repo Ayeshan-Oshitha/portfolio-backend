@@ -54,5 +54,6 @@ builder.Services.Configure<JsonOptions>(options =>
 builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IArticleService, ArticleService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
 
 builder.Build().Run();
