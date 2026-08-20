@@ -55,5 +55,6 @@ builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IArticleService, ArticleService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
+builder.Services.AddScoped<IPricingService, PricingService>();
 
 builder.Build().Run();

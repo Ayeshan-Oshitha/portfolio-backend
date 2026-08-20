@@ -1,0 +1,50 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Functions.Worker;
+
+using Portfolio.API.Common;
+using Portfolio.API.Interfaces;
+
+namespace Portfolio.API.Functions.Pricing;
+
+/// <summary>A service page's tiers — Starter, Growth, Pro.</summary>
+public class GetPublicServicePricingPlans
+{
+    private readonly IPricingService _pricing;
+
+    public GetPublicServicePricingPlans(IPricingService pricing)
+    {
+        _pricing = pricing;
+    }
+
+    [Function("GetPublicServicePricingPlans")]
+    public async Task<IActionResult> Run(
+        [HttpTrigger(
+            AuthorizationLevel.Anonymous,
+            "get",
+            Route = "public/pricing/services/{serviceId:guid}")] HttpRequest req,
+        Guid serviceId,
+        CancellationToken cancellationToken)
+    {
+        if (!QueryParameters.TryReadSite(req, out var site))
+        {
+            return ProblemResults.BadRequest("validation_failed", "Unknown site.");
+        }
+
+        if (site is null)
+        {
+            return ProblemResults.SiteRequired();
+        }
+
+        var (page, pageSize) = QueryParameters.ReadPaging(req);
+
+        var result = await _pricing.GetPublicPlansForServiceAsync(
+            site.Value,
+            serviceId,
+            page,
+            pageSize,
+            cancellationToken);
+
+        return HttpResponses.PublicJson(req, result);
+    }
+}
