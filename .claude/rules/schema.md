@@ -131,6 +131,7 @@ icon_name           text null            -- e.g. Lucide icon key
 icon_cloudinary_id  text null            -- or an uploaded SVG/PNG
 hero_image_id       text null
 is_published        bool
+published_at        timestamptz null
 + site visibility block   -- agency-only in practice, keep the shape uniform
 + timestamps / soft delete
 ```

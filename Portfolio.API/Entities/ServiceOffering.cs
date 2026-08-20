@@ -28,6 +28,9 @@ public class ServiceOffering : SiteVisibleEntity
 
     public bool IsPublished { get; set; }
 
+    /// <summary>Stamped the first time the service goes live, never cleared.</summary>
+    public DateTimeOffset? PublishedAt { get; set; }
+
     public ICollection<ServiceFeature> Features { get; set; } = [];
 
     public ICollection<PricingPlan> PricingPlans { get; set; } = [];

@@ -21,6 +21,7 @@ public class ServiceOfferingConfiguration : IEntityTypeConfiguration<ServiceOffe
         builder.Property(s => s.IconCloudinaryId).HasColumnName("icon_cloudinary_id");
         builder.Property(s => s.HeroImageId).HasColumnName("hero_image_id");
         builder.Property(s => s.IsPublished).HasColumnName("is_published");
+        builder.Property(s => s.PublishedAt).HasColumnName("published_at");
 
         builder.HasIndex(s => s.Slug).IsUnique();
     }
