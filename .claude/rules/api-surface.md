@@ -13,6 +13,11 @@ paths:
 One function per endpoint — not one router function. It keeps the Azure portal's monitoring
 readable.
 
+`FrostWoodTech.API/Docs/openapi.yaml` is the machine-readable copy of this document, hand-authored
+and served at `/api/docs`. Nothing generates it: **when you add, remove or rename a route here,
+update the spec in the same change**, or the three frontends are reading a contract that no
+longer exists.
+
 ## Public (anonymous, cached)
 
 ```
@@ -26,6 +31,8 @@ GET /api/public/pricing/services/{serviceId}?site=       # that service's tiers
 GET /api/public/faqs?site=&category=
 GET /api/public/tags?isTechnology=&category=
 GET /api/public/home?site=agency|personal
+GET /api/public/reviews?sort=latest|rating|country&page=&pageSize=   # published only, not site-scoped
+POST /api/public/reviews                                             # anonymous submission — the one public write
 ```
 
 `?site=` is **required** wherever site visibility applies. A missing `site` is a `400` with code
@@ -41,7 +48,12 @@ matching `show_on_{site}` flag is true. Order by that site's `sort_order`, then 
 `published_at`/`year` descending.
 
 `/api/public/home` is one round trip instead of six. Return only the featured slices for that
-site: featured projects, featured articles, featured services, featured pricing plans, FAQs.
+site: featured projects, featured articles, featured services, featured pricing plans, FAQs,
+featured reviews (reviews are shared across both sites, so that slice ignores `?site=`).
+
+`POST /api/public/reviews` is the one exception to "public endpoints are read-only" — an
+anonymous visitor submits a review, which lands with `is_published = false`. It is rate limited
+per IP (see `.claude/rules/auth.md`) and never returns the full row, just an id.
 
 ## Admin (JWT required)
 
@@ -64,8 +76,9 @@ CRUD   /api/admin/services              # + /{id}/features
 CRUD   /api/admin/pricing-plans
 CRUD   /api/admin/faqs
 CRUD   /api/admin/tags
+CRUD   /api/admin/reviews               # + /reorder — publish/unpublish/featured all via PUT
 
-POST   /api/admin/media/signature       # Cloudinary signed upload params
+POST   /api/admin/media/presigned-upload # Neon Object Storage presigned PUT URL
 POST   /api/admin/{entity}/reorder      # bulk sort_order update
 ```
 

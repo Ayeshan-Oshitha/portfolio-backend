@@ -23,7 +23,7 @@ rather than relying on defaults.
 ## Cold start
 
 Neon serverless compute suspends when idle, so the first request after a pause takes roughly a
-second. That is expected for a portfolio site — do not treat it as a bug or add a keep-alive
+second. That is expected for a FrostWoodTech site — do not treat it as a bug or add a keep-alive
 timer to work around it.
 
 ## Migrations

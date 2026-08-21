@@ -64,5 +64,11 @@ settings / Key Vault. Never in a committed `local.settings.json`.
 
 ## Rate limiting
 
-The login endpoint and (when it exists) the public contact endpoint need rate limiting —
-per IP, and per email on login.
+The login endpoint needs rate limiting per IP and per email —
+`ILoginRateLimiter`/`LoginRateLimiter`, a Postgres-backed fixed window (in-memory would reset
+per instance since Functions scale out).
+
+`POST /api/public/reviews` — the one anonymous public write — uses the same fixed-window idea,
+per IP only, but counts rows in the `reviews` table itself rather than a separate attempts
+table (every submission is already persisted, unlike a failed login). See
+`ReviewService.SubmitAsync`.

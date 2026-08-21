@@ -75,20 +75,37 @@ Single primary enforced by a partial unique index:
 
 ## articles
 
-No dedicated page. All articles render on one list page; "Read Article" links out to Medium.
+No dedicated page. All articles render on one list page. An article can carry its own Markdown
+body (`content_markdown`) and/or link out to Medium as a cross-post — `medium_url` is optional.
 
 ```
 id                uuid pk
 title             text
 excerpt           text                 -- the "few lines"
 published_date    date
-medium_url        text                 -- external, required
-cover_image_id    text null            -- Cloudinary public_id
+medium_url        text null            -- external cross-post link, optional, absolute URL
+content_markdown  text null            -- article body, raw markdown with media:// references
+cover_image_key   text null            -- Neon Object Storage object key
 slug              text unique          -- internal linking, optional
 is_published      bool
 + site visibility block
 + timestamps / soft delete
 ```
+
+### Embedded media in `content_markdown`
+
+Images, PDFs, and other attachments referenced inside the markdown body are never stored as real
+URLs — they use a storage-independent `media://articles/images/example.png` /
+`media://articles/documents/guide.pdf` token, matching the object key an
+`/admin/media/presigned-upload` (`target: articles`) call produced. Nothing outside the markdown
+tracks these references — there is deliberately no `article_attachments` table, since the
+markdown text is already the source of truth for what's embedded.
+
+`IArticleMediaResolver` (`ArticleMediaResolver`) rewrites every `media://...` token to a real
+`IMediaService.GetPublicUrl` URL, and only runs on the **public** read path — admin responses hand
+back the raw markdown so the editor round-trips the original tokens. This is what keeps stored
+article content portable: swapping storage providers means changing `GetPublicUrl`, never
+rewriting article rows.
 
 `article_tags` — join `(article_id, tag_id)`.
 
@@ -179,6 +196,31 @@ is_published, + site visibility block, timestamps
 ```
 
 `category` groups FAQs on the page ("Pricing", "Process", "Technical").
+
+## reviews
+
+Visitor-submitted testimonials. Not site-scoped — one shared pool feeds the home page slice and
+the dedicated reviews page on both frontends, unlike the entities in the site visibility block
+above.
+
+```
+id              uuid pk
+name            text
+country         text
+country_code    text(2)          -- ISO 3166-1 alpha-2, e.g. 'US' — frontend renders the flag
+position        text null
+rating          int              -- 1-5, CHECK (rating BETWEEN 1 AND 5)
+review_text     text
+is_published    bool             -- false on submission; admin publishes
+is_featured     bool             -- home page slice
+sort_order      int
+submitter_ip    text null        -- admin-only, spam moderation + the submission rate limit
++ timestamps / soft delete
+```
+
+Submitted anonymously through the one public **write** endpoint in the API
+(`POST /api/public/reviews`) — everything else under `/api/public/*` is read-only. Rate limited
+per IP; see `.claude/rules/auth.md`.
 
 ## users
 
