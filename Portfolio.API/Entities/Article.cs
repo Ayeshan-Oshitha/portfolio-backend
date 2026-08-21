@@ -16,8 +16,8 @@ public class Article : SiteVisibleEntity
     /// <summary>External, required, absolute URL.</summary>
     public required string MediumUrl { get; set; }
 
-    /// <summary>Cloudinary public_id.</summary>
-    public string? CoverImageId { get; set; }
+    /// <summary>Neon object key.</summary>
+    public string? CoverImageKey { get; set; }
 
     /// <summary>Optional, for internal linking.</summary>
     public string? Slug { get; set; }

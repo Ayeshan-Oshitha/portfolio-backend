@@ -5,8 +5,8 @@ using Portfolio.API.Enums;
 namespace Portfolio.API.Interfaces;
 
 /// <summary>
-/// The <c>users</c> aggregate: registration, password login and the super admin's approval
-/// workflow. Google sign-in and refresh tokens are not implemented yet.
+/// The <c>users</c> aggregate: registration, password and Google sign-in, refresh token
+/// rotation, and the super admin's approval workflow.
 /// </summary>
 public interface IUserService
 {
@@ -16,7 +16,23 @@ public interface IUserService
     /// </summary>
     Task<ServiceResult<AdminUserResponse>> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken);
 
-    Task<ServiceResult<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken);
+    /// <param name="ipAddress">
+    /// The caller's address, for rate limiting. Null when it cannot be determined — the per-email
+    /// limit still applies.
+    /// </param>
+    Task<ServiceResult<AuthResponse>> LoginAsync(
+        LoginRequest request,
+        string? ipAddress,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Exchanges a verified Google ID token for the same JWT pair as password login. An email with
+    /// no user row gets a <c>pending</c> account — Google having verified the address says nothing
+    /// about whether the super admin wants them in the CMS.
+    /// </summary>
+    Task<ServiceResult<AuthResponse>> GoogleSignInAsync(
+        GoogleSignInRequest request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Rotates a refresh token for a fresh pair. Presenting an already-revoked token is treated as

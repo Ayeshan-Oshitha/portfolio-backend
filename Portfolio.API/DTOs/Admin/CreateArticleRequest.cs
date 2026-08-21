@@ -14,7 +14,7 @@ public class CreateArticleRequest
     /// <summary>Required, and must be an absolute URL.</summary>
     public string? MediumUrl { get; set; }
 
-    public string? CoverImageId { get; set; }
+    public string? CoverImageKey { get; set; }
 
     public bool IsPublished { get; set; }
 

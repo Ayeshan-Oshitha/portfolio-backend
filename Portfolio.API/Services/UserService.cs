@@ -38,17 +38,23 @@ public class UserService : IUserService
 
     private readonly PortfolioDbContext _db;
     private readonly IJwtTokenService _tokens;
+    private readonly IGoogleTokenValidator _google;
+    private readonly ILoginRateLimiter _rateLimiter;
     private readonly CurrentUser _currentUser;
     private readonly JwtOptions _jwtOptions;
 
     public UserService(
         PortfolioDbContext db,
         IJwtTokenService tokens,
+        IGoogleTokenValidator google,
+        ILoginRateLimiter rateLimiter,
         CurrentUser currentUser,
         IOptions<JwtOptions> jwtOptions)
     {
         _db = db;
         _tokens = tokens;
+        _google = google;
+        _rateLimiter = rateLimiter;
         _currentUser = currentUser;
         _jwtOptions = jwtOptions.Value;
     }
@@ -97,6 +103,7 @@ public class UserService : IUserService
 
     public async Task<ServiceResult<AuthResponse>> LoginAsync(
         LoginRequest request,
+        string? ipAddress,
         CancellationToken cancellationToken)
     {
         var email = NormaliseEmail(request.Email);
@@ -107,6 +114,15 @@ public class UserService : IUserService
             return ServiceResult<AuthResponse>.Validation("Email and password are required.");
         }
 
+        // Checked before the password so a blocked caller costs an index lookup rather than an
+        // Argon2 hash — otherwise the throttle is itself the cheapest way to burn the CPU.
+        if (await _rateLimiter.IsBlockedAsync(email, ipAddress, cancellationToken))
+        {
+            return ServiceResult<AuthResponse>.Unauthorized(
+                "too_many_attempts",
+                "Too many failed sign-in attempts. Wait a few minutes and try again.");
+        }
+
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
 
         if (user is null)
@@ -114,12 +130,15 @@ public class UserService : IUserService
             // Same work, same answer as a wrong password: the response must not reveal whether
             // the account exists.
             PasswordHasher.BurnVerifyTime(password);
+            await _rateLimiter.RecordFailureAsync(email, ipAddress, cancellationToken);
 
             return InvalidCredentials();
         }
 
         if (!PasswordHasher.Verify(user.PasswordHash, password))
         {
+            await _rateLimiter.RecordFailureAsync(email, ipAddress, cancellationToken);
+
             return InvalidCredentials();
         }
 
@@ -127,6 +146,90 @@ public class UserService : IUserService
         // A non-approved user is rejected here at token issue rather than handed a scopeless token.
         if (user.Status != UserStatus.Approved)
         {
+            return NotApproved(user);
+        }
+
+        user.LastLoginAt = DateTimeOffset.UtcNow;
+
+        // A successful sign-in clears the slate, so earlier fumbled attempts do not count
+        // towards a later lockout.
+        await _rateLimiter.ClearAsync(email, cancellationToken);
+
+        var (response, _) = await IssueTokensAsync(user, cancellationToken);
+
+        return ServiceResult<AuthResponse>.Success(response);
+    }
+
+    public async Task<ServiceResult<AuthResponse>> GoogleSignInAsync(
+        GoogleSignInRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (Blank(request.IdToken) is not { } idToken)
+        {
+            return ServiceResult<AuthResponse>.Validation("An idToken is required.");
+        }
+
+        var validated = await _google.ValidateAsync(idToken, cancellationToken);
+        if (!validated.IsSuccess)
+        {
+            return ServiceResult<AuthResponse>.Failure(validated.Error!);
+        }
+
+        var identity = validated.Value!;
+
+        // An unverified address is not proof of anything — matching on it would let anyone who
+        // can create a Google account with someone else's email claim their CMS user.
+        if (!identity.EmailVerified)
+        {
+            return ServiceResult<AuthResponse>.Unauthorized(
+                "google_email_unverified", "This Google account's email address is not verified.");
+        }
+
+        // Match on the subject first: it is stable, whereas an address can be reassigned.
+        // IgnoreQueryFilters so a soft-deleted account is found and refused rather than silently
+        // re-created as a brand new pending user.
+        var user = await _db.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(
+                u => u.GoogleSubjectId == identity.Subject || u.Email == identity.Email,
+                cancellationToken);
+
+        if (user is null)
+        {
+            user = new User
+            {
+                Email = identity.Email,
+                FirstName = identity.FirstName ?? identity.Email,
+                LastName = identity.LastName ?? string.Empty,
+                GoogleSubjectId = identity.Subject,
+                AvatarUrl = identity.AvatarUrl,
+                // No password: this account can only ever arrive through Google.
+                PasswordHash = null,
+                Role = UserRole.Admin,
+                Status = UserStatus.Pending
+            };
+
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            return NotApproved(user);
+        }
+
+        if (user.IsDeleted)
+        {
+            return ServiceResult<AuthResponse>.Forbidden(
+                "account_disabled", "This account has been disabled. Contact the super admin.");
+        }
+
+        // First Google sign-in for an account that registered with a password: link the two.
+        // The password still works — this adds a way in, it does not replace one.
+        user.GoogleSubjectId ??= identity.Subject;
+        user.AvatarUrl = identity.AvatarUrl ?? user.AvatarUrl;
+
+        if (user.Status != UserStatus.Approved)
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+
             return NotApproved(user);
         }
 

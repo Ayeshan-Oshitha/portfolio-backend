@@ -38,9 +38,9 @@ namespace Portfolio.API.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("agency_sort_order");
 
-                    b.Property<string>("CoverImageId")
+                    b.Property<string>("CoverImageKey")
                         .HasColumnType("text")
-                        .HasColumnName("cover_image_id");
+                        .HasColumnName("cover_image_key");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -198,6 +198,35 @@ namespace Portfolio.API.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("faqs", (string)null);
+                });
+
+            modelBuilder.Entity("Portfolio.API.Entities.LoginAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AttemptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attempted_at");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("email");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("text")
+                        .HasColumnName("ip_address");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email", "AttemptedAt");
+
+                    b.HasIndex("IpAddress", "AttemptedAt");
+
+                    b.ToTable("login_attempts", (string)null);
                 });
 
             modelBuilder.Entity("Portfolio.API.Entities.PricingPlan", b =>
@@ -471,11 +500,6 @@ namespace Portfolio.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("alt_text");
 
-                    b.Property<string>("CloudinaryId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("cloudinary_id");
-
                     b.Property<int>("Height")
                         .HasColumnType("integer")
                         .HasColumnName("height");
@@ -483,6 +507,11 @@ namespace Portfolio.API.Migrations
                     b.Property<bool>("IsPrimary")
                         .HasColumnType("boolean")
                         .HasColumnName("is_primary");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("object_key");
 
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid")
@@ -636,13 +665,13 @@ namespace Portfolio.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("hero_image_id");
 
-                    b.Property<string>("IconCloudinaryId")
-                        .HasColumnType("text")
-                        .HasColumnName("icon_cloudinary_id");
-
                     b.Property<string>("IconName")
                         .HasColumnType("text")
                         .HasColumnName("icon_name");
+
+                    b.Property<string>("IconObjectKey")
+                        .HasColumnType("text")
+                        .HasColumnName("icon_object_key");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -712,9 +741,9 @@ namespace Portfolio.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<string>("IconCloudinaryId")
+                    b.Property<string>("IconObjectKey")
                         .HasColumnType("text")
-                        .HasColumnName("icon_cloudinary_id");
+                        .HasColumnName("icon_object_key");
 
                     b.Property<string>("IconUrl")
                         .HasColumnType("text")

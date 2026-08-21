@@ -22,7 +22,7 @@ public class ServiceOffering : SiteVisibleEntity
     public string? IconName { get; set; }
 
     /// <summary>Or an uploaded SVG/PNG.</summary>
-    public string? IconCloudinaryId { get; set; }
+    public string? IconObjectKey { get; set; }
 
     public string? HeroImageId { get; set; }
 

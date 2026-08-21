@@ -17,7 +17,7 @@ public sealed class AdminServiceResponse
 
     public string? IconName { get; init; }
 
-    public string? IconCloudinaryId { get; init; }
+    public string? IconObjectKey { get; init; }
 
     public string? HeroImageId { get; init; }
 

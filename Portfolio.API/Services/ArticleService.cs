@@ -171,7 +171,7 @@ public class ArticleService : IArticleService
             Slug = slug,
             PublishedDate = request.PublishedDate,
             MediumUrl = mediumUrl!,
-            CoverImageId = Blank(request.CoverImageId),
+            CoverImageKey = Blank(request.CoverImageKey),
             IsPublished = request.IsPublished,
             ShowOnAgency = request.ShowOnAgency,
             FeaturedOnAgency = request.FeaturedOnAgency,
@@ -233,7 +233,7 @@ public class ArticleService : IArticleService
         article.Slug = slug;
         article.PublishedDate = request.PublishedDate;
         article.MediumUrl = mediumUrl!;
-        article.CoverImageId = Blank(request.CoverImageId);
+        article.CoverImageKey = Blank(request.CoverImageKey);
         article.IsPublished = request.IsPublished;
         article.ShowOnAgency = request.ShowOnAgency;
         article.FeaturedOnAgency = request.FeaturedOnAgency;
@@ -243,6 +243,24 @@ public class ArticleService : IArticleService
         article.PersonalSortOrder = request.PersonalSortOrder;
 
         SyncTags(article, tagIds);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return await GetByIdAsync(article.Id, cancellationToken);
+    }
+
+    public async Task<ServiceResult<AdminArticleResponse>> SetPublishedAsync(
+        Guid id,
+        SetPublishedRequest request,
+        CancellationToken cancellationToken)
+    {
+        var article = await _db.Articles.FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+        if (article is null)
+        {
+            return NotFound(id);
+        }
+
+        article.IsPublished = request.IsPublished;
 
         await _db.SaveChangesAsync(cancellationToken);
 
@@ -425,7 +443,7 @@ public class ArticleService : IArticleService
                 Slug = a.Slug,
                 PublishedDate = a.PublishedDate,
                 MediumUrl = a.MediumUrl,
-                CoverImageId = a.CoverImageId,
+                CoverImageKey = a.CoverImageKey,
                 Featured = a.FeaturedOnAgency,
                 SortOrder = a.AgencySortOrder,
                 Tags = a.ArticleTags
@@ -455,7 +473,7 @@ public class ArticleService : IArticleService
             Slug = a.Slug,
             PublishedDate = a.PublishedDate,
             MediumUrl = a.MediumUrl,
-            CoverImageId = a.CoverImageId,
+            CoverImageKey = a.CoverImageKey,
             Featured = a.FeaturedOnPersonal,
             SortOrder = a.PersonalSortOrder,
             Tags = a.ArticleTags
@@ -485,7 +503,7 @@ public class ArticleService : IArticleService
         Slug = a.Slug,
         PublishedDate = a.PublishedDate,
         MediumUrl = a.MediumUrl,
-        CoverImageId = a.CoverImageId,
+        CoverImageKey = a.CoverImageKey,
         IsPublished = a.IsPublished,
         ShowOnAgency = a.ShowOnAgency,
         FeaturedOnAgency = a.FeaturedOnAgency,
@@ -504,7 +522,7 @@ public class ArticleService : IArticleService
                 Slug = at.Tag.Slug,
                 IsTechnology = at.Tag.IsTechnology,
                 TechnologyCategory = at.Tag.TechnologyCategory,
-                IconCloudinaryId = at.Tag.IconCloudinaryId,
+                IconObjectKey = at.Tag.IconObjectKey,
                 IconUrl = at.Tag.IconUrl,
                 ColorHex = at.Tag.ColorHex,
                 SortOrder = at.Tag.SortOrder,

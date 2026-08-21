@@ -16,8 +16,8 @@ public class CreateServiceRequest
     /// <summary>e.g. a Lucide icon key.</summary>
     public string? IconName { get; set; }
 
-    /// <summary>Or an uploaded SVG/PNG — a Cloudinary public_id.</summary>
-    public string? IconCloudinaryId { get; set; }
+    /// <summary>Or an uploaded SVG/PNG — a Neon object key.</summary>
+    public string? IconObjectKey { get; set; }
 
     public string? HeroImageId { get; set; }
 

@@ -13,7 +13,7 @@ public sealed class CreateTagRequest
 
     public TechCategory? TechnologyCategory { get; set; }
 
-    public string? IconCloudinaryId { get; set; }
+    public string? IconObjectKey { get; set; }
 
     public string? IconUrl { get; set; }
 

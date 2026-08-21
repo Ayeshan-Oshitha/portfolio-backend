@@ -1,15 +1,15 @@
 namespace Portfolio.API.DTOs.Public;
 
 /// <summary>
-/// Cloudinary metadata only. The frontends build responsive URLs from the public_id with
-/// transformations — the API never returns per-size URLs.
+/// Neon Object Storage metadata only — image bytes never live in Postgres, and the API never
+/// returns per-size URLs.
 /// </summary>
 public sealed class ProjectImageResponse
 {
     public required Guid Id { get; init; }
 
-    /// <summary>Cloudinary public_id.</summary>
-    public required string CloudinaryId { get; init; }
+    /// <summary>Neon object key.</summary>
+    public required string ObjectKey { get; init; }
 
     public required string Url { get; init; }
 

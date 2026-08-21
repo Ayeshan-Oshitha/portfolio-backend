@@ -14,7 +14,7 @@ public class ProjectImageConfiguration : IEntityTypeConfiguration<ProjectImage>
         builder.HasKey(i => i.Id);
         builder.Property(i => i.Id).HasColumnName("id");
         builder.Property(i => i.ProjectId).HasColumnName("project_id");
-        builder.Property(i => i.CloudinaryId).HasColumnName("cloudinary_id").IsRequired();
+        builder.Property(i => i.ObjectKey).HasColumnName("object_key").IsRequired();
         builder.Property(i => i.Url).HasColumnName("url").IsRequired();
         builder.Property(i => i.AltText).HasColumnName("alt_text").IsRequired();
         builder.Property(i => i.Width).HasColumnName("width");

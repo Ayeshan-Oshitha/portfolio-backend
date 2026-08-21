@@ -40,7 +40,7 @@ public class Login
         if (body is null)
             return ProblemResults.BadRequest("validation_failed", "A request body is required.");
 
-        var result = await _users.LoginAsync(body, cancellationToken);
+        var result = await _users.LoginAsync(body, ClientAddress.Read(req), cancellationToken);
 
         return result.IsSuccess
             ? new OkObjectResult(result.Value)

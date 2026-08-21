@@ -3,7 +3,7 @@ using Portfolio.API.Enums;
 namespace Portfolio.API.DTOs.Public;
 
 /// <summary>
-/// What the two public frontends see. No audit fields, no Cloudinary ids — those are admin-only.
+/// What the two public frontends see. No audit fields, no object keys — those are admin-only.
 /// </summary>
 public sealed class TagResponse
 {

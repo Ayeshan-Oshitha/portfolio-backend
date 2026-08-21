@@ -379,3 +379,8 @@ dotnet_naming_style.camelcase.required_prefix =
 dotnet_naming_style.camelcase.required_suffix = 
 dotnet_naming_style.camelcase.word_separator = 
 dotnet_naming_style.camelcase.capitalization = camel_case
+
+# EF Core writes these; they are not hand-maintained and must not fail the build.
+[Portfolio.API/Migrations/**.cs]
+generated_code = true
+dotnet_diagnostic.IDE0161.severity = none

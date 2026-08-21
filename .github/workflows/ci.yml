@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore Portfolio.sln
+
+      - name: Build
+        run: dotnet build Portfolio.sln --configuration Release --no-restore
+
+      # No test project exists yet (see Gap 9). Once Portfolio.Tests is added this step
+      # starts running automatically; --no-build keeps it on the artifacts built above.
+      - name: Test
+        run: dotnet test Portfolio.sln --configuration Release --no-build --verbosity normal
+
+  migrations-check:
+    name: Verify migrations are up to date
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install dotnet-ef
+        run: dotnet tool install --global dotnet-ef
+
+      # Catches an entity or configuration change that was committed without a matching
+      # migration — the failure mode that otherwise only shows up against a real database.
+      - name: Check for pending model changes
+        run: dotnet ef migrations has-pending-model-changes --project Portfolio.API

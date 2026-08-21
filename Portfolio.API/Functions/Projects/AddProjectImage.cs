@@ -20,7 +20,7 @@ public class AddProjectImage
     }
 
     /// <summary>
-    /// Records what Cloudinary handed back after a direct upload — the bytes never pass through
+    /// Records what Neon Object Storage handed back after a direct upload — the bytes never pass through
     /// the API.
     /// </summary>
     [Function("AddProjectImage")]

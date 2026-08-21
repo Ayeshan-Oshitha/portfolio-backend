@@ -1,3 +1,5 @@
+using Amazon.S3;
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
@@ -13,8 +15,11 @@ using Npgsql;
 using Portfolio.API.Auth;
 using Portfolio.API.Common;
 using Portfolio.API.Data;
+using Portfolio.API.Docs;
+using Portfolio.API.Email;
 using Portfolio.API.Enums;
 using Portfolio.API.Interfaces;
+using Portfolio.API.Media;
 using Portfolio.API.Middleware;
 using Portfolio.API.Services;
 
@@ -60,12 +65,50 @@ builder.Services.AddScoped<IArticleService, ArticleService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
 builder.Services.AddScoped<IPricingService, PricingService>();
+builder.Services.AddScoped<IFaqService, FaqService>();
+
+builder.Services.Configure<NeonStorageOptions>(builder.Configuration.GetSection("NeonS3"));
+// The S3 client is thread-safe and meant to be long-lived, so it is built once from options
+// rather than re-created per request.
+builder.Services.AddSingleton<IAmazonS3>(sp =>
+{
+    var options = sp.GetRequiredService<IOptions<NeonStorageOptions>>().Value;
+
+    return new AmazonS3Client(
+        options.AccessKey,
+        options.SecretKey,
+        new AmazonS3Config { ServiceURL = options.Endpoint, ForcePathStyle = true });
+});
+builder.Services.AddScoped<IMediaService, NeonStorageService>();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<SuperAdminOptions>(builder.Configuration.GetSection("SuperAdmin"));
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
+
+builder.Services.Configure<GoogleOptions>(builder.Configuration.GetSection("Google"));
+// Singleton so Google's discovery document and signing keys are fetched once and cached, not
+// re-fetched on every sign-in.
+builder.Services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
+
+builder.Services.AddScoped<ILoginRateLimiter, LoginRateLimiter>();
 builder.Services.AddScoped<CurrentUser>();
 builder.Services.AddScoped<IUserService, UserService>();
+
+builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection("Cors"));
+
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
+// The logging transport sends nothing. A real provider (Resend, SES) replaces this line with a
+// typed client — AddHttpClient<IEmailService, ResendEmailService>() — and nothing else changes.
+builder.Services.AddScoped<IEmailService, LoggingEmailService>();
+
+// /api/docs and /api/openapi.yaml, both 404 unless Docs__Enabled is set.
+builder.Services.Configure<DocsOptions>(builder.Configuration.GetSection("Docs"));
+
+// Order matters. CORS is outermost so its headers land on error responses too — a 401 or 500
+// the browser cannot read is a 401 or 500 the SPA cannot report. The exception handler then
+// wraps the auth middleware as well as the functions.
+builder.UseMiddleware<CorsMiddleware>();
+builder.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Everything under /api/admin/* is authorised here, not per function.
 builder.UseMiddleware<JwtAuthenticationMiddleware>();

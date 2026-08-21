@@ -11,7 +11,22 @@
     "SuperAdmin__Email": "<super-admin-email>",
     "SuperAdmin__Password": "<super-admin-password-at-least-8-chars>",
     "SuperAdmin__FirstName": "Super",
-    "SuperAdmin__LastName": "Admin"
+    "SuperAdmin__LastName": "Admin",
+    "NeonS3__Endpoint": "<neon-s3-endpoint>",
+    "NeonS3__AccessKey": "<neon-s3-access-key>",
+    "NeonS3__SecretKey": "<neon-s3-secret-key>",
+    "NeonS3__BucketName": "<neon-s3-bucket-name>",
+    "NeonS3__BaseFolder": "portfolio",
+    "Google__ClientId": "<google-oauth-client-id>.apps.googleusercontent.com",
+    "Email__Provider": "log",
+    "Email__FromAddress": "<no-reply@your-domain>",
+    "Email__FromName": "Portfolio",
+    "Email__ApiKey": "<provider-api-key>",
+    "Email__BaseUrl": "http://localhost:5175",
+    "Docs__Enabled": "true",
+    "Cors__AllowedOrigins__0": "http://localhost:5173",
+    "Cors__AllowedOrigins__1": "http://localhost:5174",
+    "Cors__AllowedOrigins__2": "http://localhost:5175"
   },
   "ConnectionStrings": {
     "Default": "Host=<neon-pooled-host>;Database=<db>;Username=<user>;Password=<password>;SslMode=Require;Maximum Pool Size=8;Timeout=15;Command Timeout=30"

@@ -22,8 +22,8 @@ public sealed class ServiceResponse
     /// <summary>e.g. a Lucide icon key.</summary>
     public string? IconName { get; init; }
 
-    /// <summary>Or an uploaded SVG/PNG — a Cloudinary public_id.</summary>
-    public string? IconCloudinaryId { get; init; }
+    /// <summary>Or an uploaded SVG/PNG — a Neon object key.</summary>
+    public string? IconObjectKey { get; init; }
 
     public string? HeroImageId { get; init; }
 

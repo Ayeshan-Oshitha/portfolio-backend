@@ -18,10 +18,12 @@ public class ProjectService : IProjectService
     private const int EarliestYear = 1990;
 
     private readonly PortfolioDbContext _db;
+    private readonly IMediaService _mediaService;
 
-    public ProjectService(PortfolioDbContext db)
+    public ProjectService(PortfolioDbContext db, IMediaService mediaService)
     {
         _db = db;
+        _mediaService = mediaService;
     }
 
     public async Task<PagedResult<ProjectResponse>> GetPublicProjectsAsync(
@@ -369,11 +371,11 @@ public class ProjectService : IProjectService
             return ImageProjectNotFound(projectId);
         }
 
-        var cloudinaryId = Blank(request.CloudinaryId);
+        var objectKey = Blank(request.ObjectKey);
         var url = Blank(request.Url);
         var altText = Blank(request.AltText);
 
-        var validationError = ValidateImage(cloudinaryId, url, altText, request);
+        var validationError = ValidateImage(objectKey, url, altText, request);
         if (validationError is not null)
         {
             return ServiceResult<ProjectImageResponse>.Validation(validationError);
@@ -387,7 +389,7 @@ public class ProjectService : IProjectService
         {
             Id = Guid.NewGuid(),
             ProjectId = project.Id,
-            CloudinaryId = cloudinaryId!,
+            ObjectKey = objectKey!,
             Url = url!,
             AltText = altText!,
             Width = request.Width,
@@ -424,11 +426,11 @@ public class ProjectService : IProjectService
             return ImageNotFound(projectId, imageId);
         }
 
-        var cloudinaryId = Blank(request.CloudinaryId);
+        var objectKey = Blank(request.ObjectKey);
         var url = Blank(request.Url);
         var altText = Blank(request.AltText);
 
-        var validationError = ValidateImage(cloudinaryId, url, altText, request);
+        var validationError = ValidateImage(objectKey, url, altText, request);
         if (validationError is not null)
         {
             return ServiceResult<ProjectImageResponse>.Validation(validationError);
@@ -438,7 +440,7 @@ public class ProjectService : IProjectService
         // stays put.
         var isPrimary = request.IsPrimary || project.Images.Count == 1;
 
-        image.CloudinaryId = cloudinaryId!;
+        image.ObjectKey = objectKey!;
         image.Url = url!;
         image.AltText = altText!;
         image.Width = request.Width;
@@ -474,8 +476,8 @@ public class ProjectService : IProjectService
                 $"No image with id {imageId} on project {projectId}.");
         }
 
-        // Hard delete — the row carries no soft-delete flag. The Cloudinary asset is left alone;
-        // destroying it belongs to the media slice.
+        // Hard delete — the row carries no soft-delete flag, so the Neon Object Storage asset goes too
+        // (below, once the row is actually gone).
         project.Images.Remove(image);
         _db.ProjectImages.Remove(image);
 
@@ -496,6 +498,11 @@ public class ProjectService : IProjectService
                 second: () => successor.IsPrimary = true,
                 cancellationToken);
         }
+
+        // After the row is committed, never before: a destroy that succeeded against a delete
+        // that then rolled back would leave a row pointing at nothing. The reverse — a failed
+        // destroy — only leaves an orphan asset, so it must not fail the request.
+        await _mediaService.DeleteFileAsync(image.ObjectKey, cancellationToken);
 
         return ServiceResult<bool>.Success(true);
     }
@@ -606,14 +613,14 @@ public class ProjectService : IProjectService
 
     /// <summary>Null when the image is valid, otherwise the message to hand back.</summary>
     private static string? ValidateImage(
-        string? cloudinaryId,
+        string? objectKey,
         string? url,
         string? altText,
         AddProjectImageRequest request)
     {
-        if (cloudinaryId is null)
+        if (objectKey is null)
         {
-            return "cloudinaryId is required.";
+            return "objectKey is required.";
         }
 
         if (url is null || !IsAbsoluteHttpUrl(url))
@@ -773,7 +780,7 @@ public class ProjectService : IProjectService
     private static ProjectImageResponse ToImageResponse(ProjectImage image) => new()
     {
         Id = image.Id,
-        CloudinaryId = image.CloudinaryId,
+        ObjectKey = image.ObjectKey,
         Url = image.Url,
         AltText = image.AltText,
         Width = image.Width,
@@ -831,7 +838,7 @@ public class ProjectService : IProjectService
                     .Select(i => new ProjectImageResponse
                     {
                         Id = i.Id,
-                        CloudinaryId = i.CloudinaryId,
+                        ObjectKey = i.ObjectKey,
                         Url = i.Url,
                         AltText = i.AltText,
                         Width = i.Width,
@@ -884,7 +891,7 @@ public class ProjectService : IProjectService
                 .Select(i => new ProjectImageResponse
                 {
                     Id = i.Id,
-                    CloudinaryId = i.CloudinaryId,
+                    ObjectKey = i.ObjectKey,
                     Url = i.Url,
                     AltText = i.AltText,
                     Width = i.Width,
@@ -931,7 +938,7 @@ public class ProjectService : IProjectService
                 Slug = pt.Tag.Slug,
                 IsTechnology = pt.Tag.IsTechnology,
                 TechnologyCategory = pt.Tag.TechnologyCategory,
-                IconCloudinaryId = pt.Tag.IconCloudinaryId,
+                IconObjectKey = pt.Tag.IconObjectKey,
                 IconUrl = pt.Tag.IconUrl,
                 ColorHex = pt.Tag.ColorHex,
                 SortOrder = pt.Tag.SortOrder,
@@ -945,7 +952,7 @@ public class ProjectService : IProjectService
             .Select(i => new ProjectImageResponse
             {
                 Id = i.Id,
-                CloudinaryId = i.CloudinaryId,
+                ObjectKey = i.ObjectKey,
                 Url = i.Url,
                 AltText = i.AltText,
                 Width = i.Width,

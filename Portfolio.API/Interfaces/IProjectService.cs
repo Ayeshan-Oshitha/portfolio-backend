@@ -68,7 +68,7 @@ public interface IProjectService
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Hard delete — image rows carry no soft-delete flag. The Cloudinary asset is left alone.
+    /// Hard delete — image rows carry no soft-delete flag. The Neon Object Storage asset is left alone.
     /// </summary>
     Task<ServiceResult<bool>> DeleteImageAsync(Guid projectId, Guid imageId, CancellationToken cancellationToken);
 

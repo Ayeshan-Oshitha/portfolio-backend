@@ -27,6 +27,8 @@ public sealed class JwtAuthenticationMiddleware : IFunctionsWorkerMiddleware
     [
         "/admin/auth/register",
         "/admin/auth/login",
+        // Exchanging a Google token is how a caller gets its first access token.
+        "/admin/auth/google",
         // Both must work with a dead access token — that is the whole point of them.
         "/admin/auth/refresh",
         "/admin/auth/logout"

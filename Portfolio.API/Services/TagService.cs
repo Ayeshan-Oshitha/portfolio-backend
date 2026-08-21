@@ -100,7 +100,7 @@ public partial class TagService : ITagService
             name,
             request.IsTechnology,
             request.TechnologyCategory,
-            request.IconCloudinaryId,
+            request.IconObjectKey,
             request.IconUrl,
             request.ColorHex);
 
@@ -122,7 +122,7 @@ public partial class TagService : ITagService
             Slug = slug,
             IsTechnology = request.IsTechnology,
             TechnologyCategory = request.TechnologyCategory,
-            IconCloudinaryId = Blank(request.IconCloudinaryId),
+            IconObjectKey = Blank(request.IconObjectKey),
             IconUrl = Blank(request.IconUrl),
             ColorHex = Blank(request.ColorHex)?.ToLowerInvariant(),
             SortOrder = request.SortOrder
@@ -151,7 +151,7 @@ public partial class TagService : ITagService
             name,
             request.IsTechnology,
             request.TechnologyCategory,
-            request.IconCloudinaryId,
+            request.IconObjectKey,
             request.IconUrl,
             request.ColorHex);
 
@@ -170,7 +170,7 @@ public partial class TagService : ITagService
         tag.Slug = slug;
         tag.IsTechnology = request.IsTechnology;
         tag.TechnologyCategory = request.TechnologyCategory;
-        tag.IconCloudinaryId = Blank(request.IconCloudinaryId);
+        tag.IconObjectKey = Blank(request.IconObjectKey);
         tag.IconUrl = Blank(request.IconUrl);
         tag.ColorHex = Blank(request.ColorHex)?.ToLowerInvariant();
         tag.SortOrder = request.SortOrder;
@@ -230,7 +230,7 @@ public partial class TagService : ITagService
         string? name,
         bool isTechnology,
         TechCategory? technologyCategory,
-        string? iconCloudinaryId,
+        string? iconObjectKey,
         string? iconUrl,
         string? colorHex)
     {
@@ -246,9 +246,9 @@ public partial class TagService : ITagService
                 return "technologyCategory is required when isTechnology is true.";
             }
 
-            if (string.IsNullOrWhiteSpace(iconCloudinaryId))
+            if (string.IsNullOrWhiteSpace(iconObjectKey))
             {
-                return "iconCloudinaryId is required when isTechnology is true.";
+                return "iconObjectKey is required when isTechnology is true.";
             }
         }
         else
@@ -258,7 +258,7 @@ public partial class TagService : ITagService
                 return "technologyCategory must be null when isTechnology is false.";
             }
 
-            if (!string.IsNullOrWhiteSpace(iconCloudinaryId) || !string.IsNullOrWhiteSpace(iconUrl))
+            if (!string.IsNullOrWhiteSpace(iconObjectKey) || !string.IsNullOrWhiteSpace(iconUrl))
             {
                 return "Icon fields must be null when isTechnology is false.";
             }
@@ -294,7 +294,7 @@ public partial class TagService : ITagService
         Slug = tag.Slug,
         IsTechnology = tag.IsTechnology,
         TechnologyCategory = tag.TechnologyCategory,
-        IconCloudinaryId = tag.IconCloudinaryId,
+        IconObjectKey = tag.IconObjectKey,
         IconUrl = tag.IconUrl,
         ColorHex = tag.ColorHex,
         SortOrder = tag.SortOrder,

@@ -17,7 +17,7 @@ public class ArticleConfiguration : IEntityTypeConfiguration<Article>
         builder.Property(a => a.Excerpt).HasColumnName("excerpt").IsRequired();
         builder.Property(a => a.PublishedDate).HasColumnName("published_date");
         builder.Property(a => a.MediumUrl).HasColumnName("medium_url").IsRequired();
-        builder.Property(a => a.CoverImageId).HasColumnName("cover_image_id");
+        builder.Property(a => a.CoverImageKey).HasColumnName("cover_image_key");
         builder.Property(a => a.Slug).HasColumnName("slug");
         builder.Property(a => a.IsPublished).HasColumnName("is_published");
 

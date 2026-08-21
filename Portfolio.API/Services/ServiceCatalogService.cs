@@ -156,7 +156,7 @@ public class ServiceCatalogService : IServiceCatalogService
             ShortDescription = shortDescription!,
             Description = description!,
             IconName = Blank(request.IconName),
-            IconCloudinaryId = Blank(request.IconCloudinaryId),
+            IconObjectKey = Blank(request.IconObjectKey),
             HeroImageId = Blank(request.HeroImageId),
             ShowOnAgency = request.ShowOnAgency,
             FeaturedOnAgency = request.FeaturedOnAgency,
@@ -208,7 +208,7 @@ public class ServiceCatalogService : IServiceCatalogService
         service.ShortDescription = shortDescription!;
         service.Description = description!;
         service.IconName = Blank(request.IconName);
-        service.IconCloudinaryId = Blank(request.IconCloudinaryId);
+        service.IconObjectKey = Blank(request.IconObjectKey);
         service.HeroImageId = Blank(request.HeroImageId);
         service.ShowOnAgency = request.ShowOnAgency;
         service.FeaturedOnAgency = request.FeaturedOnAgency;
@@ -553,7 +553,7 @@ public class ServiceCatalogService : IServiceCatalogService
                 ShortDescription = s.ShortDescription,
                 Description = s.Description,
                 IconName = s.IconName,
-                IconCloudinaryId = s.IconCloudinaryId,
+                IconObjectKey = s.IconObjectKey,
                 HeroImageId = s.HeroImageId,
                 PublishedAt = s.PublishedAt,
                 Featured = s.FeaturedOnAgency,
@@ -581,7 +581,7 @@ public class ServiceCatalogService : IServiceCatalogService
             ShortDescription = s.ShortDescription,
             Description = s.Description,
             IconName = s.IconName,
-            IconCloudinaryId = s.IconCloudinaryId,
+            IconObjectKey = s.IconObjectKey,
             HeroImageId = s.HeroImageId,
             PublishedAt = s.PublishedAt,
             Featured = s.FeaturedOnPersonal,
@@ -609,7 +609,7 @@ public class ServiceCatalogService : IServiceCatalogService
         ShortDescription = s.ShortDescription,
         Description = s.Description,
         IconName = s.IconName,
-        IconCloudinaryId = s.IconCloudinaryId,
+        IconObjectKey = s.IconObjectKey,
         HeroImageId = s.HeroImageId,
         IsPublished = s.IsPublished,
         PublishedAt = s.PublishedAt,

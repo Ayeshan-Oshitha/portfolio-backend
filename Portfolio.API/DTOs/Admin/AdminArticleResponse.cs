@@ -15,7 +15,7 @@ public sealed class AdminArticleResponse
 
     public required string MediumUrl { get; init; }
 
-    public string? CoverImageId { get; init; }
+    public string? CoverImageKey { get; init; }
 
     public required bool IsPublished { get; init; }
 

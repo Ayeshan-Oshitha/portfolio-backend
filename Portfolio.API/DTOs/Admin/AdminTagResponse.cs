@@ -2,7 +2,7 @@ using Portfolio.API.Enums;
 
 namespace Portfolio.API.DTOs.Admin;
 
-/// <summary>Admin view: adds the Cloudinary id and audit metadata.</summary>
+/// <summary>Admin view: adds the object key and audit metadata.</summary>
 public sealed class AdminTagResponse
 {
     public required Guid Id { get; init; }
@@ -15,7 +15,7 @@ public sealed class AdminTagResponse
 
     public TechCategory? TechnologyCategory { get; init; }
 
-    public string? IconCloudinaryId { get; init; }
+    public string? IconObjectKey { get; init; }
 
     public string? IconUrl { get; init; }
 

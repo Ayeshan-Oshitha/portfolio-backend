@@ -1,13 +1,13 @@
 namespace Portfolio.API.DTOs.Admin;
 
 /// <summary>
-/// Written after the client has uploaded straight to Cloudinary — the API stores the metadata
+/// Written after the client has uploaded straight to Neon Object Storage — the API stores the metadata
 /// it hands back, never the bytes.
 /// </summary>
 public class AddProjectImageRequest
 {
-    /// <summary>Cloudinary public_id.</summary>
-    public string? CloudinaryId { get; set; }
+    /// <summary>Neon object key.</summary>
+    public string? ObjectKey { get; set; }
 
     public string? Url { get; set; }
 

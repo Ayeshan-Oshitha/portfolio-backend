@@ -1,6 +1,6 @@
 namespace Portfolio.API.Entities;
 
-/// <summary>Cloudinary metadata only — image bytes never live in Postgres.</summary>
+/// <summary>Neon Object Storage metadata only — image bytes never live in Postgres.</summary>
 public class ProjectImage
 {
     public Guid Id { get; set; }
@@ -9,7 +9,7 @@ public class ProjectImage
 
     public Project Project { get; set; } = null!;
 
-    public required string CloudinaryId { get; set; }
+    public required string ObjectKey { get; set; }
 
     public required string Url { get; set; }
 

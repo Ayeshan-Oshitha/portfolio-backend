@@ -41,6 +41,8 @@ public class PortfolioDbContext : DbContext
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<LoginAttempt> LoginAttempts => Set<LoginAttempt>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

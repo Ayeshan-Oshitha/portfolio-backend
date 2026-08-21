@@ -43,6 +43,15 @@ public interface IArticleService
         UpdateArticleRequest request,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Flips the draft flag on its own. Unlike projects and services there is no published_at to
+    /// stamp — an article's PublishedDate is the author's own date, not the go-live moment.
+    /// </summary>
+    Task<ServiceResult<AdminArticleResponse>> SetPublishedAsync(
+        Guid id,
+        SetPublishedRequest request,
+        CancellationToken cancellationToken);
+
     /// <summary>Soft delete.</summary>
     Task<ServiceResult<bool>> DeleteAsync(Guid id, CancellationToken cancellationToken);
 

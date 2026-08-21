@@ -19,8 +19,8 @@ public sealed class ArticleResponse
 
     public required string MediumUrl { get; init; }
 
-    /// <summary>Cloudinary public_id — the frontend builds the delivery URL.</summary>
-    public string? CoverImageId { get; init; }
+    /// <summary>Neon object key — the frontend builds the delivery URL.</summary>
+    public string? CoverImageKey { get; init; }
 
     /// <summary>Featured on the requested site.</summary>
     public required bool Featured { get; init; }

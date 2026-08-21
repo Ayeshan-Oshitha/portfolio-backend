@@ -18,7 +18,7 @@ public class ServiceOfferingConfiguration : IEntityTypeConfiguration<ServiceOffe
         builder.Property(s => s.ShortDescription).HasColumnName("short_description").IsRequired();
         builder.Property(s => s.Description).HasColumnName("description").IsRequired();
         builder.Property(s => s.IconName).HasColumnName("icon_name");
-        builder.Property(s => s.IconCloudinaryId).HasColumnName("icon_cloudinary_id");
+        builder.Property(s => s.IconObjectKey).HasColumnName("icon_object_key");
         builder.Property(s => s.HeroImageId).HasColumnName("hero_image_id");
         builder.Property(s => s.IsPublished).HasColumnName("is_published");
         builder.Property(s => s.PublishedAt).HasColumnName("published_at");

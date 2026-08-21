@@ -19,7 +19,7 @@ public class Tag : AuditableEntity
     public TechCategory? TechnologyCategory { get; set; }
 
     /// <summary>Required when <see cref="IsTechnology"/> is true, otherwise must be null.</summary>
-    public string? IconCloudinaryId { get; set; }
+    public string? IconObjectKey { get; set; }
 
     public string? IconUrl { get; set; }
 

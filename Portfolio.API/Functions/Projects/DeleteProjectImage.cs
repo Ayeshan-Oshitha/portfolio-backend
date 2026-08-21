@@ -17,8 +17,9 @@ public class DeleteProjectImage
     }
 
     /// <summary>
-    /// Hard delete — image rows carry no soft-delete flag. The Cloudinary asset survives;
-    /// destroying it belongs to the media slice.
+    /// Hard delete — image rows carry no soft-delete flag, so the Neon Object Storage asset is destroyed
+    /// along with the row. Neon Object Storage being unreachable leaves an orphan asset but still
+    /// succeeds; the row is what the caller asked to remove.
     /// </summary>
     [Function("DeleteProjectImage")]
     public async Task<IActionResult> Run(
