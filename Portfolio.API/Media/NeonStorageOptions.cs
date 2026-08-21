@@ -13,6 +13,9 @@ public sealed class NeonStorageOptions
     /// <summary>Signs every request. Lives in app settings / Key Vault, never in a committed file.</summary>
     public string SecretKey { get; set; } = string.Empty;
 
+    /// <summary>Region Neon expects for SigV4 request signing (their S3-compatible endpoint requires it).</summary>
+    public string Region { get; set; } = string.Empty;
+
     public string BucketName { get; set; } = string.Empty;
 
     /// <summary>Root of the folder convention, e.g. <c>portfolio/projects/{slug}/</c>.</summary>
@@ -22,5 +25,6 @@ public sealed class NeonStorageOptions
         !string.IsNullOrWhiteSpace(Endpoint)
         && !string.IsNullOrWhiteSpace(AccessKey)
         && !string.IsNullOrWhiteSpace(SecretKey)
+        && !string.IsNullOrWhiteSpace(Region)
         && !string.IsNullOrWhiteSpace(BucketName);
 }

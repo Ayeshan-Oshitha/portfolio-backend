@@ -11,7 +11,7 @@ public class PresignedUploadRequest
     /// <summary>Required. Decides the folder — the client never names one itself.</summary>
     public MediaTarget? Target { get; set; }
 
-    /// <summary>Required when <see cref="Target"/> is <c>projects</c>; ignored otherwise.</summary>
+    /// <summary>Required when <see cref="Target"/> is <c>projects</c> or <c>articles</c>; ignored otherwise.</summary>
     public string? Slug { get; set; }
 
     /// <summary>Optional. Supply it to overwrite one specific object instead of adding a new one.</summary>

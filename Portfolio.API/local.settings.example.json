@@ -15,6 +15,7 @@
     "NeonS3__Endpoint": "<neon-s3-endpoint>",
     "NeonS3__AccessKey": "<neon-s3-access-key>",
     "NeonS3__SecretKey": "<neon-s3-secret-key>",
+    "NeonS3__Region": "<neon-s3-region>",
     "NeonS3__BucketName": "<neon-s3-bucket-name>",
     "NeonS3__BaseFolder": "portfolio",
     "Google__ClientId": "<google-oauth-client-id>.apps.googleusercontent.com",

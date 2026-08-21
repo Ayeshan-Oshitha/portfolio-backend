@@ -112,7 +112,7 @@ public class NeonStorageService : IMediaService
     {
         var root = _options.BaseFolder.Trim('/');
 
-        if (target != MediaTarget.Projects)
+        if (target != MediaTarget.Projects && target != MediaTarget.Articles)
         {
             return ServiceResult<string>.Success($"{root}/{target.ToString().ToLowerInvariant()}/");
         }
@@ -120,9 +120,10 @@ public class NeonStorageService : IMediaService
         // Re-slugging is what makes the path safe: SlugGenerator strips everything but [a-z0-9-],
         // so no "../" can survive it.
         var safeSlug = string.IsNullOrWhiteSpace(slug) ? string.Empty : SlugGenerator.Generate(slug);
+        var folderName = target.ToString().ToLowerInvariant();
 
         return safeSlug.Length == 0
-            ? ServiceResult<string>.Validation("slug is required when target is projects.")
-            : ServiceResult<string>.Success($"{root}/projects/{safeSlug}/");
+            ? ServiceResult<string>.Validation($"slug is required when target is {folderName}.")
+            : ServiceResult<string>.Success($"{root}/{folderName}/{safeSlug}/");
     }
 }

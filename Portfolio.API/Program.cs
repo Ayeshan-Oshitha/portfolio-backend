@@ -77,7 +77,12 @@ builder.Services.AddSingleton<IAmazonS3>(sp =>
     return new AmazonS3Client(
         options.AccessKey,
         options.SecretKey,
-        new AmazonS3Config { ServiceURL = options.Endpoint, ForcePathStyle = true });
+        new AmazonS3Config
+        {
+            ServiceURL = options.Endpoint,
+            ForcePathStyle = true,
+            AuthenticationRegion = options.Region,
+        });
 });
 builder.Services.AddScoped<IMediaService, NeonStorageService>();
 builder.Services.AddScoped<IArticleMediaResolver, ArticleMediaResolver>();

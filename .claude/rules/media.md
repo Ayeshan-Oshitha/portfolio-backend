@@ -38,13 +38,14 @@ responsible for whatever responsive delivery the bucket/CDN in front of it suppo
 portfolio/projects/{slug}/
 portfolio/services/
 portfolio/tags/
-portfolio/articles/
+portfolio/articles/{slug}/
 ```
 
 The client never sends a folder path — it sends `target` (`projects | services | tags |
-articles`) plus a `slug` when the target is `projects`, and the API builds the folder (used as
-the S3 key prefix). The slug is re-run through `SlugGenerator`, so nothing outside the base
-folder is reachable even with a stolen admin token. The root comes from `NeonS3__BaseFolder`.
+articles`) plus a `slug` when the target is `projects` or `articles`, and the API builds the
+folder (used as the S3 key prefix). The slug is re-run through `SlugGenerator`, so nothing
+outside the base folder is reachable even with a stolen admin token. The root comes from
+`NeonS3__BaseFolder`.
 
 ## Deletes
 
@@ -58,6 +59,6 @@ Storage was unreachable is not. `project_images` rows are the one hard delete th
 
 ## Config
 
-`NeonS3__Endpoint`, `NeonS3__AccessKey`, `NeonS3__SecretKey`, `NeonS3__BucketName`,
-`NeonS3__BaseFolder` — bound to `NeonStorageOptions`. Secrets live in app settings / Key Vault,
-never in a committed `local.settings.json`.
+`NeonS3__Endpoint`, `NeonS3__AccessKey`, `NeonS3__SecretKey`, `NeonS3__Region`,
+`NeonS3__BucketName`, `NeonS3__BaseFolder` — bound to `NeonStorageOptions`. Secrets live in app
+settings / Key Vault, never in a committed `local.settings.json`.

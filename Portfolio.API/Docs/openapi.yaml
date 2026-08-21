@@ -1417,7 +1417,8 @@ paths:
         `objectKey`, dimensions and alt text.
 
         The client sends a `target` rather than a folder path, so a stolen admin token cannot
-        write anywhere else in the bucket. `slug` is required when the target is `projects`.
+        write anywhere else in the bucket. `slug` is required when the target is `projects` or
+        `articles`.
       requestBody:
         required: true
         content:
@@ -2353,8 +2354,8 @@ components:
         slug:
           type: string
           description: |
-            Required when `target` is `projects`. Re-slugged server-side, so nothing outside the
-            base folder is reachable.
+            Required when `target` is `projects` or `articles`. Re-slugged server-side, so
+            nothing outside the base folder is reachable.
         objectKey:
           type: string
           description: Overwrite a specific object instead of creating a new one.
