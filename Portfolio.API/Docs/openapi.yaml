@@ -1788,23 +1788,30 @@ components:
 
     ArticleResponse:
       type: object
-      description: Articles live on Medium; this row is the card that links to them.
+      description: >
+        An article renders from its own contentMarkdown, and may also link out to Medium as a
+        cross-post. contentMarkdown has every media:// reference already resolved to a real URL.
       properties:
         id: { type: string, format: uuid }
         title: { type: string }
         excerpt: { type: string }
         slug: { type: [string, "null"] }
         publishedDate: { type: string, format: date }
-        mediumUrl: { type: string, format: uri }
+        mediumUrl: { type: [string, "null"], format: uri }
         coverImageKey:
           type: [string, "null"]
           description: Neon Object Storage object key.
+        contentMarkdown:
+          type: [string, "null"]
+          description: >
+            Markdown body with every media://articles/... reference resolved to a real Neon
+            Object Storage URL. Ready to hand straight to a Markdown renderer.
         featured: { type: boolean }
         sortOrder: { type: integer }
         tags:
           type: array
           items: { $ref: "#/components/schemas/TagResponse" }
-      required: [id, title, excerpt, publishedDate, mediumUrl, featured, sortOrder, tags]
+      required: [id, title, excerpt, publishedDate, featured, sortOrder, tags]
 
     ServiceFeatureResponse:
       type: object
@@ -2006,13 +2013,16 @@ components:
             excerpt: { type: string }
             slug: { type: [string, "null"] }
             publishedDate: { type: string, format: date }
-            mediumUrl: { type: string, format: uri }
+            mediumUrl: { type: [string, "null"], format: uri }
             coverImageKey: { type: [string, "null"] }
+            contentMarkdown:
+              type: [string, "null"]
+              description: Raw Markdown, media:// tokens unresolved — this is what the editor edits.
             isPublished: { type: boolean }
             tags:
               type: array
               items: { $ref: "#/components/schemas/AdminTagResponse" }
-          required: [id, title, excerpt, publishedDate, mediumUrl, isPublished, tags]
+          required: [id, title, excerpt, publishedDate, isPublished, tags]
 
     AdminServiceResponse:
       allOf:
@@ -2211,13 +2221,19 @@ components:
             mediumUrl:
               type: string
               format: uri
-              description: Required, and must be an absolute URL.
+              description: Optional cross-post link. Must be an absolute URL when present.
             coverImageKey: { type: string, description: Neon Object Storage object key. }
+            contentMarkdown:
+              type: string
+              description: >
+                Raw Markdown. Embed media with a media://articles/... reference (e.g.
+                media://articles/images/example.png) instead of a real URL — insert the
+                reference after uploading via POST /admin/media/presigned-upload.
             isPublished: { type: boolean, default: false }
             tagIds:
               type: array
               items: { type: string, format: uuid }
-          required: [title, excerpt, publishedDate, mediumUrl]
+          required: [title, excerpt, publishedDate]
 
     CreateServiceRequest:
       allOf:

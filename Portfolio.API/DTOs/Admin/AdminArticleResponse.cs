@@ -13,9 +13,12 @@ public sealed class AdminArticleResponse
 
     public required DateOnly PublishedDate { get; init; }
 
-    public required string MediumUrl { get; init; }
+    public string? MediumUrl { get; init; }
 
     public string? CoverImageKey { get; init; }
+
+    /// <summary>Raw Markdown, <c>media://</c> tokens unresolved — this is what the editor edits.</summary>
+    public string? ContentMarkdown { get; init; }
 
     public required bool IsPublished { get; init; }
 

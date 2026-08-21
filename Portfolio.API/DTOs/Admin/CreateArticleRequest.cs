@@ -11,10 +11,13 @@ public class CreateArticleRequest
 
     public DateOnly PublishedDate { get; set; }
 
-    /// <summary>Required, and must be an absolute URL.</summary>
+    /// <summary>Optional cross-post link. Must be an absolute URL when present.</summary>
     public string? MediumUrl { get; set; }
 
     public string? CoverImageKey { get; set; }
+
+    /// <summary>Raw Markdown, with embedded media as <c>media://articles/...</c> references.</summary>
+    public string? ContentMarkdown { get; set; }
 
     public bool IsPublished { get; set; }
 

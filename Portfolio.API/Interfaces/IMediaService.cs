@@ -13,6 +13,13 @@ public interface IMediaService
     ServiceResult<PresignedUploadResponse> CreatePresignedUpload(PresignedUploadRequest request);
 
     /// <summary>
+    /// Builds the public delivery URL for an object key. Pure string building, no request leaves
+    /// the process — this is the one place that knows how a key maps to a URL, so a storage
+    /// provider change only touches this method.
+    /// </summary>
+    string GetPublicUrl(string objectKey);
+
+    /// <summary>
     /// Deletes the object behind a key. Returns false rather than throwing when Neon Object
     /// Storage is unreachable — an orphaned object must never fail the request that removed its
     /// row. An object that is already gone counts as success.

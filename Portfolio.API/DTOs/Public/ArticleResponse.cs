@@ -5,7 +5,7 @@ namespace Portfolio.API.DTOs.Public;
 /// <see cref="Featured"/> and <see cref="SortOrder"/> — the other site's flags, the draft state
 /// and the audit metadata never cross this boundary.
 /// </summary>
-public sealed class ArticleResponse
+public sealed record ArticleResponse
 {
     public required Guid Id { get; init; }
 
@@ -17,10 +17,16 @@ public sealed class ArticleResponse
 
     public required DateOnly PublishedDate { get; init; }
 
-    public required string MediumUrl { get; init; }
+    public string? MediumUrl { get; init; }
 
     /// <summary>Neon object key — the frontend builds the delivery URL.</summary>
     public string? CoverImageKey { get; init; }
+
+    /// <summary>
+    /// Markdown body with every <c>media://...</c> reference already resolved to a real URL —
+    /// ready to hand to a Markdown renderer as-is.
+    /// </summary>
+    public string? ContentMarkdown { get; init; }
 
     /// <summary>Featured on the requested site.</summary>
     public required bool Featured { get; init; }

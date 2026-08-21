@@ -23,7 +23,7 @@ public class SiteVisibilityTests
     public async Task Personal_only_article_is_not_returned_for_the_agency_site()
     {
         await using var db = _fixture.CreateContext();
-        var service = new ArticleService(db);
+        var service = new ArticleService(db, new ArticleMediaResolver(new FakeMediaService()));
 
         var created = await service.CreateAsync(
             NewArticle("Personal only", showOnAgency: false, showOnPersonal: true),
@@ -45,7 +45,7 @@ public class SiteVisibilityTests
     public async Task Unpublished_article_is_never_returned_on_the_public_surface()
     {
         await using var db = _fixture.CreateContext();
-        var service = new ArticleService(db);
+        var service = new ArticleService(db, new ArticleMediaResolver(new FakeMediaService()));
 
         var request = NewArticle("Still a draft", showOnAgency: true, showOnPersonal: false);
         request.IsPublished = false;
@@ -69,7 +69,7 @@ public class SiteVisibilityTests
     public async Task Soft_deleted_article_disappears_from_both_surfaces()
     {
         await using var db = _fixture.CreateContext();
-        var service = new ArticleService(db);
+        var service = new ArticleService(db, new ArticleMediaResolver(new FakeMediaService()));
 
         var created = await service.CreateAsync(
             NewArticle("Doomed", showOnAgency: true, showOnPersonal: false),
@@ -96,7 +96,7 @@ public class SiteVisibilityTests
     public async Task Featuring_an_article_on_a_site_it_is_not_shown_on_is_rejected(bool agency, bool personal)
     {
         await using var db = _fixture.CreateContext();
-        var service = new ArticleService(db);
+        var service = new ArticleService(db, new ArticleMediaResolver(new FakeMediaService()));
 
         var request = NewArticle("Contradictory", showOnAgency: false, showOnPersonal: false);
         request.FeaturedOnAgency = agency;

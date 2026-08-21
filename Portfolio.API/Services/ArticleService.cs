@@ -15,10 +15,12 @@ namespace Portfolio.API.Services;
 public class ArticleService : IArticleService
 {
     private readonly PortfolioDbContext _db;
+    private readonly IArticleMediaResolver _mediaResolver;
 
-    public ArticleService(PortfolioDbContext db)
+    public ArticleService(PortfolioDbContext db, IArticleMediaResolver mediaResolver)
     {
         _db = db;
+        _mediaResolver = mediaResolver;
     }
 
     public async Task<PagedResult<ArticleResponse>> GetPublicArticlesAsync(
@@ -55,7 +57,7 @@ public class ArticleService : IArticleService
 
         return new PagedResult<ArticleResponse>
         {
-            Items = items,
+            Items = [.. items.Select(ResolveMedia)],
             Page = page,
             PageSize = pageSize,
             Total = total
@@ -76,8 +78,17 @@ public class ArticleService : IArticleService
             ? ServiceResult<ArticleResponse>.NotFound(
                 "not_found",
                 $"No published article with slug '{slug}' on this site.")
-            : ServiceResult<ArticleResponse>.Success(article);
+            : ServiceResult<ArticleResponse>.Success(ResolveMedia(article));
     }
+
+    /// <summary>
+    /// Public responses only — the admin surface hands back raw Markdown so the editor round-trips
+    /// the original <c>media://</c> tokens instead of baked-in URLs.
+    /// </summary>
+    private ArticleResponse ResolveMedia(ArticleResponse article) =>
+        article.ContentMarkdown is null
+            ? article
+            : article with { ContentMarkdown = _mediaResolver.ResolveMediaReferences(article.ContentMarkdown) };
 
     public async Task<PagedResult<AdminArticleResponse>> GetAdminArticlesAsync(
         Site? site,
@@ -170,7 +181,8 @@ public class ArticleService : IArticleService
             Excerpt = excerpt!,
             Slug = slug,
             PublishedDate = request.PublishedDate,
-            MediumUrl = mediumUrl!,
+            MediumUrl = mediumUrl,
+            ContentMarkdown = Blank(request.ContentMarkdown),
             CoverImageKey = Blank(request.CoverImageKey),
             IsPublished = request.IsPublished,
             ShowOnAgency = request.ShowOnAgency,
@@ -232,7 +244,8 @@ public class ArticleService : IArticleService
         article.Excerpt = excerpt!;
         article.Slug = slug;
         article.PublishedDate = request.PublishedDate;
-        article.MediumUrl = mediumUrl!;
+        article.MediumUrl = mediumUrl;
+        article.ContentMarkdown = Blank(request.ContentMarkdown);
         article.CoverImageKey = Blank(request.CoverImageKey);
         article.IsPublished = request.IsPublished;
         article.ShowOnAgency = request.ShowOnAgency;
@@ -353,13 +366,9 @@ public class ArticleService : IArticleService
             return "Excerpt is required.";
         }
 
-        if (mediumUrl is null)
-        {
-            return "mediumUrl is required.";
-        }
-
-        if (!Uri.TryCreate(mediumUrl, UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        if (mediumUrl is not null
+            && (!Uri.TryCreate(mediumUrl, UriKind.Absolute, out var uri)
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)))
         {
             return "mediumUrl must be an absolute http(s) URL.";
         }
@@ -444,6 +453,7 @@ public class ArticleService : IArticleService
                 PublishedDate = a.PublishedDate,
                 MediumUrl = a.MediumUrl,
                 CoverImageKey = a.CoverImageKey,
+                ContentMarkdown = a.ContentMarkdown,
                 Featured = a.FeaturedOnAgency,
                 SortOrder = a.AgencySortOrder,
                 Tags = a.ArticleTags
@@ -474,6 +484,7 @@ public class ArticleService : IArticleService
             PublishedDate = a.PublishedDate,
             MediumUrl = a.MediumUrl,
             CoverImageKey = a.CoverImageKey,
+            ContentMarkdown = a.ContentMarkdown,
             Featured = a.FeaturedOnPersonal,
             SortOrder = a.PersonalSortOrder,
             Tags = a.ArticleTags
@@ -504,6 +515,7 @@ public class ArticleService : IArticleService
         PublishedDate = a.PublishedDate,
         MediumUrl = a.MediumUrl,
         CoverImageKey = a.CoverImageKey,
+        ContentMarkdown = a.ContentMarkdown,
         IsPublished = a.IsPublished,
         ShowOnAgency = a.ShowOnAgency,
         FeaturedOnAgency = a.FeaturedOnAgency,

@@ -19,7 +19,7 @@ public class TagAndPricingRulesTests
     {
         await using var db = _fixture.CreateContext();
         var tags = new TagService(db);
-        var articles = new ArticleService(db);
+        var articles = new ArticleService(db, new ArticleMediaResolver(new FakeMediaService()));
 
         var tag = await tags.CreateAsync(
             new CreateTagRequest { Name = $"Frontend {Guid.NewGuid():N}", IsTechnology = false },

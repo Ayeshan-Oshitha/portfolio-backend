@@ -16,6 +16,8 @@ public sealed class FakeMediaService : IMediaService
     public ServiceResult<PresignedUploadResponse> CreatePresignedUpload(PresignedUploadRequest request) =>
         throw new NotSupportedException("Presigning is not exercised by these tests.");
 
+    public string GetPublicUrl(string objectKey) => $"https://fake-storage.test/{objectKey}";
+
     public Task<bool> DeleteFileAsync(string objectKey, CancellationToken cancellationToken)
     {
         Deleted.Add(objectKey);

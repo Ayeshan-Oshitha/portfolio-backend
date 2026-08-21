@@ -76,6 +76,9 @@ public class NeonStorageService : IMediaService
         });
     }
 
+    public string GetPublicUrl(string objectKey) =>
+        $"{_options.Endpoint.TrimEnd('/')}/{_options.BucketName}/{objectKey.TrimStart('/')}";
+
     public async Task<bool> DeleteFileAsync(string objectKey, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(objectKey) || !_options.IsConfigured)

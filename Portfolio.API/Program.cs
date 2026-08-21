@@ -80,6 +80,7 @@ builder.Services.AddSingleton<IAmazonS3>(sp =>
         new AmazonS3Config { ServiceURL = options.Endpoint, ForcePathStyle = true });
 });
 builder.Services.AddScoped<IMediaService, NeonStorageService>();
+builder.Services.AddScoped<IArticleMediaResolver, ArticleMediaResolver>();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<SuperAdminOptions>(builder.Configuration.GetSection("SuperAdmin"));
