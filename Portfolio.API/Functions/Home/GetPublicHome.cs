@@ -23,19 +23,22 @@ public class GetPublicHome
     private readonly IServiceCatalogService _serviceCatalogService;
     private readonly IPricingService _pricingService;
     private readonly IFaqService _faqService;
+    private readonly IReviewService _reviewService;
 
     public GetPublicHome(
         IProjectService projectService,
         IArticleService articleService,
         IServiceCatalogService serviceCatalogService,
         IPricingService pricingService,
-        IFaqService faqService)
+        IFaqService faqService,
+        IReviewService reviewService)
     {
         _projectService = projectService;
         _articleService = articleService;
         _serviceCatalogService = serviceCatalogService;
         _pricingService = pricingService;
         _faqService = faqService;
+        _reviewService = reviewService;
     }
 
     /// <summary>
@@ -92,13 +95,16 @@ public class GetPublicHome
 
         var faqs = await _faqService.GetPublicFaqsAsync(site.Value, category: null, cancellationToken);
 
+        var reviews = await _reviewService.GetFeaturedForHomeAsync(SliceSize, cancellationToken);
+
         var payload = new HomeResponse
         {
             FeaturedProjects = projects.Items,
             FeaturedArticles = articles.Items,
             FeaturedServices = services.Items,
             FeaturedPricingPlans = pricingPlans.Items,
-            Faqs = [.. faqs.Take(FaqSliceSize)]
+            Faqs = [.. faqs.Take(FaqSliceSize)],
+            FeaturedReviews = reviews
         };
 
         return HttpResponses.PublicJson(req, payload);

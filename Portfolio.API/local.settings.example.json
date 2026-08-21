@@ -1,35 +1,35 @@
 {
   "IsEncrypted": false,
   "Values": {
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "AzureWebJobsStorage": "<azure-web-jobs-storage>",
+    "FUNCTIONS_WORKER_RUNTIME": "<functions-worker-runtime>",
     "Jwt__Signer": "<a-long-random-secret-at-least-32-chars>",
-    "Jwt__Issuer": "portfolio-api",
-    "Jwt__Audience": "portfolio-admin",
-    "Jwt__AccessTokenMinutes": "15",
-    "Jwt__RefreshTokenDays": "30",
+    "Jwt__Issuer": "<jwt-issuer>",
+    "Jwt__Audience": "<jwt-audience>",
+    "Jwt__AccessTokenMinutes": "<jwt-access-token-minutes>",
+    "Jwt__RefreshTokenDays": "<jwt-refresh-token-days>",
     "SuperAdmin__Email": "<super-admin-email>",
     "SuperAdmin__Password": "<super-admin-password-at-least-8-chars>",
-    "SuperAdmin__FirstName": "Super",
-    "SuperAdmin__LastName": "Admin",
+    "SuperAdmin__FirstName": "<super-admin-first-name>",
+    "SuperAdmin__LastName": "<super-admin-last-name>",
     "NeonS3__Endpoint": "<neon-s3-endpoint>",
     "NeonS3__AccessKey": "<neon-s3-access-key>",
     "NeonS3__SecretKey": "<neon-s3-secret-key>",
     "NeonS3__Region": "<neon-s3-region>",
     "NeonS3__BucketName": "<neon-s3-bucket-name>",
-    "NeonS3__BaseFolder": "portfolio",
+    "NeonS3__BaseFolder": "<neon-s3-base-folder>",
     "Google__ClientId": "<google-oauth-client-id>.apps.googleusercontent.com",
-    "Email__Provider": "log",
+    "Email__Provider": "<email-provider>",
     "Email__FromAddress": "<no-reply@your-domain>",
-    "Email__FromName": "Portfolio",
+    "Email__FromName": "<email-from-name>",
     "Email__ApiKey": "<provider-api-key>",
-    "Email__BaseUrl": "http://localhost:5175",
-    "Docs__Enabled": "true",
-    "Cors__AllowedOrigins__0": "http://localhost:5173",
-    "Cors__AllowedOrigins__1": "http://localhost:5174",
-    "Cors__AllowedOrigins__2": "http://localhost:5175"
+    "Email__BaseUrl": "<email-base-url>",
+    "Docs__Enabled": "<docs-enabled>",
+    "Cors__AllowedOrigins__0": "<cors-allowed-origin-0>",
+    "Cors__AllowedOrigins__1": "<cors-allowed-origin-1>",
+    "Cors__AllowedOrigins__2": "<cors-allowed-origin-2>"
   },
   "ConnectionStrings": {
-    "Default": "Host=<neon-pooled-host>;Database=<db>;Username=<user>;Password=<password>;SslMode=Require;Maximum Pool Size=8;Timeout=15;Command Timeout=30"
+    "Default": "<connection-string>"
   }
 }

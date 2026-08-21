@@ -17,4 +17,8 @@ public sealed class HomeResponse
 
     /// <summary>Not filtered by featured: the home page shows the FAQ list as-is.</summary>
     public required IReadOnlyList<FaqResponse> Faqs { get; init; }
+
+    /// <summary>Featured, published reviews. Not site-scoped — reviews are shared across both
+    /// public sites.</summary>
+    public required IReadOnlyList<ReviewResponse> FeaturedReviews { get; init; }
 }

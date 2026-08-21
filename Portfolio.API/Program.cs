@@ -66,6 +66,7 @@ builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
 builder.Services.AddScoped<IPricingService, PricingService>();
 builder.Services.AddScoped<IFaqService, FaqService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
 
 builder.Services.Configure<NeonStorageOptions>(builder.Configuration.GetSection("NeonS3"));
 // The S3 client is thread-safe and meant to be long-lived, so it is built once from options

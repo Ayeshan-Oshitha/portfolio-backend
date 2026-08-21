@@ -197,6 +197,31 @@ is_published, + site visibility block, timestamps
 
 `category` groups FAQs on the page ("Pricing", "Process", "Technical").
 
+## reviews
+
+Visitor-submitted testimonials. Not site-scoped — one shared pool feeds the home page slice and
+the dedicated reviews page on both frontends, unlike the entities in the site visibility block
+above.
+
+```
+id              uuid pk
+name            text
+country         text
+country_code    text(2)          -- ISO 3166-1 alpha-2, e.g. 'US' — frontend renders the flag
+position        text null
+rating          int              -- 1-5, CHECK (rating BETWEEN 1 AND 5)
+review_text     text
+is_published    bool             -- false on submission; admin publishes
+is_featured     bool             -- home page slice
+sort_order      int
+submitter_ip    text null        -- admin-only, spam moderation + the submission rate limit
++ timestamps / soft delete
+```
+
+Submitted anonymously through the one public **write** endpoint in the API
+(`POST /api/public/reviews`) — everything else under `/api/public/*` is read-only. Rate limited
+per IP; see `.claude/rules/auth.md`.
+
 ## users
 
 ```

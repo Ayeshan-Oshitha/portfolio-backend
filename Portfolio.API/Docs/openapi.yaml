@@ -318,6 +318,61 @@ paths:
         "304": { $ref: "#/components/responses/NotModified" }
         "400": { $ref: "#/components/responses/SiteRequired" }
 
+  /public/reviews:
+    get:
+      tags: [public]
+      operationId: getPublicReviews
+      summary: Paged, published reviews
+      description: Not site-scoped — reviews are shared across both public sites.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ReviewSort"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: A page of published reviews.
+          headers:
+            ETag: { $ref: "#/components/headers/ETag" }
+            Cache-Control: { $ref: "#/components/headers/PublicCacheControl" }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Paged"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/ReviewResponse" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    post:
+      tags: [public]
+      operationId: submitReview
+      summary: Submit a review
+      description: |
+        The one anonymous public write in the API. Lands with `isPublished = false` — an admin
+        must publish it before it appears anywhere. Rate limited per IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitReviewRequest" }
+      responses:
+        "201":
+          description: Acknowledgement only — the row is unmoderated, so the full review is not returned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewSubmissionResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403":
+          description: Too many submissions from this address. See `code`.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
   # ------------------------------------------------------------------------------- auth
   /admin/auth/register:
     post:
@@ -1318,6 +1373,109 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  # ------------------------------------------------------------------------------- reviews
+  /admin/reviews:
+    get:
+      tags: [admin]
+      operationId: getAdminReviews
+      summary: List reviews, drafts included
+      parameters:
+        - $ref: "#/components/parameters/IsPublished"
+        - name: isFeatured
+          in: query
+          schema: { type: boolean }
+        - name: country
+          in: query
+          description: Matches either the display name or the ISO code.
+          schema: { type: string }
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: A page of reviews.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Paged"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/AdminReviewResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [admin]
+      operationId: createReview
+      summary: Add a review manually
+      description: For a testimonial collected elsewhere — not what the public submission endpoint uses.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateReviewRequest" }
+      responses:
+        "201":
+          description: The created review.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminReviewResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /admin/reviews/{id}:
+    get:
+      tags: [admin]
+      operationId: getAdminReviewById
+      summary: One review, drafts included
+      parameters: [{ $ref: "#/components/parameters/IdPath" }]
+      responses:
+        "200": { $ref: "#/components/responses/AdminReview" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [admin]
+      operationId: updateReview
+      summary: Replace a review
+      description: Also how publish/unpublish, featured, and manual reorder each happen.
+      parameters: [{ $ref: "#/components/parameters/IdPath" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateReviewRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/AdminReview" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [admin]
+      operationId: deleteReview
+      summary: Soft-delete a review
+      parameters: [{ $ref: "#/components/parameters/IdPath" }]
+      responses:
+        "204": { $ref: "#/components/responses/NoContent" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/reviews/reorder:
+    post:
+      tags: [admin]
+      operationId: reorderReviews
+      summary: Bulk sort order
+      description: Reviews have one shared order, not a per-site one — no `site` on the body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChildReorderRequest" }
+      responses:
+        "204": { $ref: "#/components/responses/NoContent" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   # ------------------------------------------------------------------------------- tags
   /admin/tags:
     get:
@@ -1485,6 +1643,10 @@ components:
       in: query
       description: Admin-only filter. Omit to get drafts and published rows alike.
       schema: { type: boolean }
+    ReviewSort:
+      name: sort
+      in: query
+      schema: { type: string, enum: [latest, rating, country], default: latest }
     IsTechnology:
       name: isTechnology
       in: query
@@ -1590,6 +1752,11 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/AdminFaqResponse" }
+    AdminReview:
+      description: The review, drafts and metadata included.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AdminReviewResponse" }
     AdminTag:
       description: The tag.
       content:
@@ -1896,9 +2063,26 @@ components:
         sortOrder: { type: integer }
       required: [id, question, answer, featured, sortOrder]
 
+    ReviewResponse:
+      type: object
+      description: The draft state, featured flag, sort order, and submitter IP never cross this boundary.
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        country: { type: string }
+        countryCode:
+          type: string
+          description: ISO 3166-1 alpha-2 — the frontend derives the flag emoji from this.
+          examples: ["US"]
+        position: { type: [string, "null"] }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        reviewText: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, name, country, countryCode, rating, reviewText, createdAt]
+
     HomeResponse:
       type: object
-      description: The featured slices for one site, plus its FAQs.
+      description: The featured slices for one site, plus its FAQs and reviews.
       properties:
         featuredProjects:
           type: array
@@ -1915,7 +2099,12 @@ components:
         faqs:
           type: array
           items: { $ref: "#/components/schemas/FaqResponse" }
-      required: [featuredProjects, featuredArticles, featuredServices, featuredPricingPlans, faqs]
+        featuredReviews:
+          type: array
+          description: Not site-scoped — reviews are shared across both public sites.
+          items: { $ref: "#/components/schemas/ReviewResponse" }
+      required:
+        [featuredProjects, featuredArticles, featuredServices, featuredPricingPlans, faqs, featuredReviews]
 
     # ------------------------------------------------------------------- shared fragments
     SiteVisibility:
@@ -2085,6 +2274,26 @@ components:
             sortOrder: { type: integer }
             isPublished: { type: boolean }
           required: [id, question, answer, sortOrder, isPublished]
+
+    AdminReviewResponse:
+      type: object
+      description: Draft state, featured flag, sort order, and the submitter's IP for spam moderation.
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        country: { type: string }
+        countryCode: { type: string, examples: ["US"] }
+        position: { type: [string, "null"] }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        reviewText: { type: string }
+        isPublished: { type: boolean }
+        isFeatured: { type: boolean }
+        sortOrder: { type: integer }
+        submitterIp: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required:
+        [id, name, country, countryCode, rating, reviewText, isPublished, isFeatured, sortOrder, createdAt, updatedAt]
 
     # ------------------------------------------------------------------- auth contracts
     RegisterRequest:
@@ -2291,6 +2500,45 @@ components:
             sortOrder: { type: integer, default: 0 }
             isPublished: { type: boolean, default: false }
           required: [question, answer]
+
+    SubmitReviewRequest:
+      type: object
+      description: What an anonymous visitor submits. Lands unpublished.
+      properties:
+        name: { type: string }
+        country: { type: string }
+        countryCode:
+          type: string
+          description: ISO 3166-1 alpha-2, e.g. `US`.
+          examples: ["US"]
+        position: { type: string }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        reviewText: { type: string, maxLength: 2000 }
+      required: [name, country, countryCode, rating, reviewText]
+
+    ReviewSubmissionResponse:
+      type: object
+      description: Deliberately thin — the review is unmoderated, so the submitter gets an id, not the row.
+      properties:
+        id: { type: string, format: uuid }
+      required: [id]
+
+    CreateReviewRequest:
+      type: object
+      description: |
+        Also used for `PUT` — an update is a full replacement. For an admin manually adding a
+        testimonial collected elsewhere; not what the public submission endpoint uses.
+      properties:
+        name: { type: string }
+        country: { type: string }
+        countryCode: { type: string, examples: ["US"] }
+        position: { type: string }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        reviewText: { type: string, maxLength: 2000 }
+        isPublished: { type: boolean, default: false }
+        isFeatured: { type: boolean, default: false }
+        sortOrder: { type: integer, default: 0 }
+      required: [name, country, countryCode, rating, reviewText]
 
     CreateTagRequest:
       type: object
