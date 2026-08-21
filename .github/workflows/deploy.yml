@@ -31,10 +31,10 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
-        run: dotnet restore Portfolio.sln
+        run: dotnet restore FrostWoodTech.sln
 
       - name: Build
-        run: dotnet build Portfolio.sln --configuration Release --no-restore
+        run: dotnet build FrostWoodTech.sln --configuration Release --no-restore
 
       - name: Install dotnet-ef
         run: dotnet tool install --global dotnet-ef
@@ -48,11 +48,11 @@ jobs:
       - name: Apply migrations
         env:
           ConnectionStrings__Default: ${{ secrets.NEON_MIGRATION_CONNECTION_STRING }}
-        run: dotnet ef database update --project Portfolio.API --no-build --configuration Release
+        run: dotnet ef database update --project FrostWoodTech.API --no-build --configuration Release
 
       - name: Publish
         run: >-
-          dotnet publish Portfolio.API/Portfolio.API.csproj
+          dotnet publish FrostWoodTech.API/FrostWoodTech.API.csproj
           --configuration Release
           --no-build
           --output ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}

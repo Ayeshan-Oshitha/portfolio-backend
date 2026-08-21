@@ -35,10 +35,10 @@ responsible for whatever responsive delivery the bucket/CDN in front of it suppo
 ## Folder convention
 
 ```
-portfolio/projects/{slug}/
-portfolio/services/
-portfolio/tags/
-portfolio/articles/{slug}/
+frostwoodtech/projects/{slug}/
+frostwoodtech/services/
+frostwoodtech/tags/
+frostwoodtech/articles/{slug}/
 ```
 
 The client never sends a folder path — it sends `target` (`projects | services | tags |

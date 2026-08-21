@@ -13,7 +13,7 @@ paths:
 One function per endpoint — not one router function. It keeps the Azure portal's monitoring
 readable.
 
-`Portfolio.API/Docs/openapi.yaml` is the machine-readable copy of this document, hand-authored
+`FrostWoodTech.API/Docs/openapi.yaml` is the machine-readable copy of this document, hand-authored
 and served at `/api/docs`. Nothing generates it: **when you add, remove or rename a route here,
 update the spec in the same change**, or the three frontends are reading a contract that no
 longer exists.

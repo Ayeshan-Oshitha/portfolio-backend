@@ -1,7 +1,7 @@
-# portfolio-backend
+# frostwoodtech-backend
 
-One headless CMS API and one database, powering three frontends: the agency portfolio, the
-personal portfolio, and the admin SPA.
+One headless CMS API and one database, powering three frontends: the FrostWoodTech agency
+site, the FrostWoodTech personal site, and the admin SPA.
 
 .NET 10 Azure Functions (isolated worker) · PostgreSQL on Neon via EF Core + Npgsql ·
 Cloudinary for media · custom JWT + Google Sign-In for admin auth.
@@ -15,7 +15,7 @@ Prerequisites: .NET 10 SDK, [Azure Functions Core Tools v4][func], a Neon databa
 Postgres), a Cloudinary account. Docker is needed only for the tests.
 
 ```bash
-cp Portfolio.API/local.settings.example.json Portfolio.API/local.settings.json
+cp FrostWoodTech.API/local.settings.example.json FrostWoodTech.API/local.settings.json
 # then fill in the placeholders — connection string, Jwt__Signer, SuperAdmin__*, Cloudinary__*
 ```
 
@@ -26,9 +26,9 @@ Apply the schema, then start the host:
 
 ```bash
 dotnet tool install --global dotnet-ef
-ConnectionStrings__Default="<your-connection-string>" dotnet ef database update --project Portfolio.API
+ConnectionStrings__Default="<your-connection-string>" dotnet ef database update --project FrostWoodTech.API
 
-cd Portfolio.API && func start
+cd FrostWoodTech.API && func start
 ```
 
 The API comes up on `http://localhost:7060`. The super admin account is seeded from
@@ -51,11 +51,11 @@ spec it renders at `http://localhost:7060/api/openapi.yaml`. Both return `404` w
 is off, which is the default — the spec maps the whole admin surface, so a deployment opts in
 rather than out.
 
-The spec is hand-authored at `Portfolio.API/Docs/openapi.yaml` and embedded in the assembly.
+The spec is hand-authored at `FrostWoodTech.API/Docs/openapi.yaml` and embedded in the assembly.
 Nothing generates it, so **a route change is a spec change**. Validate an edit with:
 
 ```bash
-npx @redocly/cli lint Portfolio.API/Docs/openapi.yaml
+npx @redocly/cli lint FrostWoodTech.API/Docs/openapi.yaml
 ```
 
 ## Tests
@@ -71,7 +71,7 @@ does not model. Docker must be running.
 ## Migrations
 
 ```bash
-dotnet ef migrations add <Name> --project Portfolio.API
+dotnet ef migrations add <Name> --project FrostWoodTech.API
 ```
 
 Migrations are applied **from CI**, never on function startup — concurrent instances would race

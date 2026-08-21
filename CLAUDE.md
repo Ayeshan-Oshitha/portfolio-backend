@@ -1,4 +1,4 @@
-# CLAUDE.md — Portfolio CMS Backend
+# CLAUDE.md — FrostWoodTech CMS Backend
 
 ## What this is
 
@@ -6,8 +6,8 @@ One headless CMS API + one database, powering **three** frontends:
 
 | Consumer | Content it reads |
 |---|---|
-| Agency portfolio (React) | Agency projects, articles, services, pricing, FAQs |
-| Personal portfolio (React) | Personal projects, articles, FAQs |
+| FrostWoodTech agency site (React) | Agency projects, articles, services, pricing, FAQs |
+| FrostWoodTech personal site (React) | Personal projects, articles, FAQs |
 | Admin SPA (React) | Everything, incl. drafts + user approvals |
 
 No duplicated rows per site — every visible entity carries per-site visibility flags and the
