@@ -11,10 +11,28 @@ namespace FrostWoodTech.API.Interfaces;
 public interface IUserService
 {
     /// <summary>
-    /// Open registration, but powerless: the new account is <c>pending</c> and gets no token until
-    /// the super admin approves it.
+    /// Open registration, but powerless: the new account starts in
+    /// <c>email_verification_required</c> and gets no token until it verifies its address and the
+    /// super admin approves it.
     /// </summary>
     Task<ServiceResult<AdminUserResponse>> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Moves a password account from <c>email_verification_required</c> to <c>pending</c>. Never
+    /// issues a token — approval still comes from the super admin.
+    /// </summary>
+    Task<ServiceResult<AdminUserResponse>> VerifyEmailAsync(
+        VerifyEmailRequest request,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Issues a fresh verification link for an account still waiting to verify. Always reports the
+    /// same generic success regardless of whether the address exists, so it cannot be used to probe
+    /// which emails are registered.
+    /// </summary>
+    Task<ServiceResult<ResendVerificationResponse>> ResendVerificationAsync(
+        ResendVerificationRequest request,
+        CancellationToken cancellationToken);
 
     /// <param name="ipAddress">
     /// The caller's address, for rate limiting. Null when it cannot be determined — the per-email

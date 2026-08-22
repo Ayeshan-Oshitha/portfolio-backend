@@ -232,12 +232,25 @@ password_hash     text null        -- null for Google-only accounts
 google_subject_id text null unique
 avatar_url        text null
 role              user_role         -- super_admin | admin
-status            user_status       -- pending | approved | rejected | disabled
+status            user_status       -- email_verification_required | pending | approved | rejected | disabled
 approved_by       uuid null fk users
 approved_at       timestamptz null
 rejection_reason  text null
 last_login_at     timestamptz null
+email_verified_at timestamptz null  -- set once, survives a later reject/disable
 + timestamps
+```
+
+`email_verification_tokens` — mirrors `refresh_tokens`' shape (hashed, single-use, not soft
+deleted so a replayed link is still recognised):
+
+```
+id            uuid pk
+user_id       uuid fk users, cascade delete
+token_hash    text unique        -- sha-256 hex of the raw token
+expires_at    timestamptz        -- 24h from issue
+created_at    timestamptz
+used_at       timestamptz null
 ```
 
 Behaviour rules live in `.claude/rules/auth.md`.

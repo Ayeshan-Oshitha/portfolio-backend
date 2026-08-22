@@ -10,31 +10,30 @@ using FrostWoodTech.API.Interfaces;
 
 namespace FrostWoodTech.API.Functions.Auth;
 
-public class Register
+public class ResendVerification
 {
     private readonly IUserService _users;
 
-    public Register(IUserService users)
+    public ResendVerification(IUserService users)
     {
         _users = users;
     }
 
     /// <summary>
-    /// Anonymous by design — see the allow-list in <c>JwtAuthenticationMiddleware</c>. Creates an
-    /// <c>email_verification_required</c> account and deliberately returns no token: the address
-    /// must be verified and the super admin must approve before sign-in works.
+    /// Anonymous by design. Always returns the same generic success, whatever the email resolves
+    /// to — see <c>UserService.ResendVerificationAsync</c>.
     /// </summary>
-    [Function("Register")]
+    [Function("ResendVerification")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/auth/register")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/auth/resend-verification")] HttpRequest req,
         CancellationToken cancellationToken)
     {
         HttpResponses.MarkNoStore(req);
 
-        RegisterRequest? body;
+        ResendVerificationRequest? body;
         try
         {
-            body = await JsonSerializer.DeserializeAsync<RegisterRequest>(
+            body = await JsonSerializer.DeserializeAsync<ResendVerificationRequest>(
                 req.Body, JsonDefaults.Options, cancellationToken);
         }
         catch (JsonException ex)
@@ -45,10 +44,8 @@ public class Register
         if (body is null)
             return ProblemResults.BadRequest("validation_failed", "A request body is required.");
 
-        var result = await _users.RegisterAsync(body, cancellationToken);
-        if (!result.IsSuccess)
-            return ProblemResults.FromError(result.Error!);
+        var result = await _users.ResendVerificationAsync(body, cancellationToken);
 
-        return new ObjectResult(result.Value) { StatusCode = StatusCodes.Status201Created };
+        return new ObjectResult(result.Value) { StatusCode = StatusCodes.Status202Accepted };
     }
 }

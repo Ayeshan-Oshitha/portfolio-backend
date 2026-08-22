@@ -380,8 +380,9 @@ paths:
       operationId: register
       summary: Request an admin account
       description: |
-        Creates a `pending` account and deliberately returns no token — a super admin approves
-        first. Anonymous by design.
+        Creates an `email_verification_required` account and sends a verification email.
+        Deliberately returns no token — the address must be verified, then a super admin approves,
+        before sign-in works. Anonymous by design.
       security: []
       requestBody:
         required: true
@@ -390,12 +391,68 @@ paths:
             schema: { $ref: "#/components/schemas/RegisterRequest" }
       responses:
         "201":
-          description: The pending account.
+          description: The newly created account, awaiting email verification.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AdminUserResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "409": { $ref: "#/components/responses/Conflict" }
+
+  /admin/auth/verify-email:
+    post:
+      tags: [auth]
+      operationId: verifyEmail
+      summary: Confirm a registered email address
+      description: |
+        Moves a password account from `email_verification_required` to `pending`. Called by the
+        admin SPA's `/verify-email` page with the token from the emailed link. Never issues a
+        token. Anonymous by design.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerifyEmailRequest" }
+      responses:
+        "200":
+          description: The account, now `pending` approval.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404":
+          description: No token matches (`invalid_verification_token`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: Already used (`verification_token_already_used`) or expired (`verification_token_expired`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /admin/auth/resend-verification:
+    post:
+      tags: [auth]
+      operationId: resendVerification
+      summary: Resend the verification email
+      description: |
+        Always returns the same generic success, whatever `email` resolves to — an unregistered,
+        already-verified, or rate-limited address gets an identical response, so this endpoint
+        cannot be used to enumerate accounts. Anonymous by design.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResendVerificationRequest" }
+      responses:
+        "202":
+          description: Generic acknowledgement.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResendVerificationResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
 
   /admin/auth/login:
     post:
@@ -413,8 +470,9 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401":
           description: |
-            Bad credentials (`invalid_credentials`), an account still awaiting approval
-            (`account_pending`), or one that was rejected or disabled.
+            Bad credentials (`invalid_credentials`), an account still awaiting email verification
+            (`email_verification_required`), still awaiting approval (`account_pending`), or one
+            that was rejected or disabled.
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
@@ -1851,7 +1909,7 @@ components:
       enum: [super_admin, admin]
     UserStatus:
       type: string
-      enum: [pending, approved, rejected, disabled]
+      enum: [email_verification_required, pending, approved, rejected, disabled]
     MediaTarget:
       type: string
       enum: [projects, services, tags, articles]
@@ -2140,6 +2198,7 @@ components:
         lastLoginAt: { type: [string, "null"], format: date-time }
         approvedAt: { type: [string, "null"], format: date-time }
         rejectionReason: { type: [string, "null"] }
+        emailVerifiedAt: { type: [string, "null"], format: date-time }
         createdAt: { type: string, format: date-time }
       required: [id, email, firstName, lastName, role, status, createdAt]
 
@@ -2308,6 +2367,24 @@ components:
           minLength: 8
         confirmPassword: { type: string, format: password }
       required: [firstName, lastName, email, password, confirmPassword]
+
+    VerifyEmailRequest:
+      type: object
+      properties:
+        token: { type: string }
+      required: [token]
+
+    ResendVerificationRequest:
+      type: object
+      properties:
+        email: { type: string, format: email }
+      required: [email]
+
+    ResendVerificationResponse:
+      type: object
+      properties:
+        message: { type: string }
+      required: [message]
 
     LoginRequest:
       type: object

@@ -61,6 +61,8 @@ per IP (see `.claude/rules/auth.md`) and never returns the full row, just an id.
 POST   /api/admin/auth/login            # email + password
 POST   /api/admin/auth/google           # Google ID token exchange
 POST   /api/admin/auth/register
+POST   /api/admin/auth/verify-email          # body { token }, moves email_verification_required -> pending
+POST   /api/admin/auth/resend-verification   # body { email }, always returns the same generic response
 POST   /api/admin/auth/refresh         # body { refreshToken }, rotates
 POST   /api/admin/auth/logout          # body { refreshToken }, revokes it
 

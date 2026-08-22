@@ -1,12 +1,14 @@
 using System.Linq.Expressions;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using FrostWoodTech.API.Auth;
 using FrostWoodTech.API.Common;
 using FrostWoodTech.API.Data;
 using FrostWoodTech.API.DTOs.Admin;
+using FrostWoodTech.API.Email;
 using FrostWoodTech.API.Entities;
 using FrostWoodTech.API.Enums;
 using FrostWoodTech.API.Interfaces;
@@ -18,6 +20,12 @@ public class UserService : IUserService
     private const int MinimumPasswordLength = 8;
 
     private const string SuperAdminOnly = "Only the super admin can manage users.";
+
+    private static readonly TimeSpan VerificationTokenLifetime = TimeSpan.FromHours(24);
+
+    private static readonly TimeSpan ResendWindow = TimeSpan.FromHours(1);
+
+    private const int MaxResendsPerEmailPerWindow = 3;
 
     private static readonly Expression<Func<User, AdminUserResponse>> AdminProjection = user =>
         new AdminUserResponse
@@ -31,6 +39,7 @@ public class UserService : IUserService
             LastLoginAt = user.LastLoginAt,
             ApprovedAt = user.ApprovedAt,
             RejectionReason = user.RejectionReason,
+            EmailVerifiedAt = user.EmailVerifiedAt,
             CreatedAt = user.CreatedAt
         };
 
@@ -42,6 +51,9 @@ public class UserService : IUserService
     private readonly ILoginRateLimiter _rateLimiter;
     private readonly CurrentUser _currentUser;
     private readonly JwtOptions _jwtOptions;
+    private readonly IEmailService _email;
+    private readonly EmailOptions _emailOptions;
+    private readonly ILogger<UserService> _logger;
 
     public UserService(
         FrostWoodTechDbContext db,
@@ -49,7 +61,10 @@ public class UserService : IUserService
         IGoogleTokenValidator google,
         ILoginRateLimiter rateLimiter,
         CurrentUser currentUser,
-        IOptions<JwtOptions> jwtOptions)
+        IOptions<JwtOptions> jwtOptions,
+        IEmailService email,
+        IOptions<EmailOptions> emailOptions,
+        ILogger<UserService> logger)
     {
         _db = db;
         _tokens = tokens;
@@ -57,6 +72,9 @@ public class UserService : IUserService
         _rateLimiter = rateLimiter;
         _currentUser = currentUser;
         _jwtOptions = jwtOptions.Value;
+        _email = email;
+        _emailOptions = emailOptions.Value;
+        _logger = logger;
     }
 
     public async Task<ServiceResult<AdminUserResponse>> RegisterAsync(
@@ -90,15 +108,152 @@ public class UserService : IUserService
             FirstName = firstName!,
             LastName = lastName!,
             PasswordHash = PasswordHasher.Hash(request.Password!),
-            // Registration is open but powerless: no token until the super admin approves.
+            // Registration is open but powerless: no token until the address is verified and the
+            // super admin approves.
             Role = UserRole.Admin,
-            Status = UserStatus.Pending
+            Status = UserStatus.EmailVerificationRequired
         };
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync(cancellationToken);
 
+        await IssueVerificationEmailAsync(user, cancellationToken);
+
         return ServiceResult<AdminUserResponse>.Success(ToResponse(user));
+    }
+
+    public async Task<ServiceResult<AdminUserResponse>> VerifyEmailAsync(
+        VerifyEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (Blank(request.Token) is not { } rawToken)
+        {
+            return ServiceResult<AdminUserResponse>.Validation("A token is required.");
+        }
+
+        var hash = EmailVerificationTokenGenerator.Hash(rawToken);
+
+        var token = await _db.EmailVerificationTokens
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken);
+
+        if (token is null)
+        {
+            return ServiceResult<AdminUserResponse>.NotFound(
+                "invalid_verification_token", "This verification link is not valid.");
+        }
+
+        if (token.UsedAt is not null || token.User.Status != UserStatus.EmailVerificationRequired)
+        {
+            return ServiceResult<AdminUserResponse>.Conflict(
+                "verification_token_already_used",
+                "This link has already been used. If you haven't verified yet, request a new one.");
+        }
+
+        if (token.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return ServiceResult<AdminUserResponse>.Conflict(
+                "verification_token_expired",
+                "This link has expired. Request a new verification email.");
+        }
+
+        var user = token.User;
+
+        user.Status = UserStatus.Pending;
+        user.EmailVerifiedAt = DateTimeOffset.UtcNow;
+        token.UsedAt = DateTimeOffset.UtcNow;
+
+        // Any other unused link for this user is now moot.
+        await _db.EmailVerificationTokens
+            .Where(t => t.UserId == user.Id && t.UsedAt == null && t.Id != token.Id)
+            .ExecuteUpdateAsync(t => t.SetProperty(x => x.UsedAt, DateTimeOffset.UtcNow), cancellationToken);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult<AdminUserResponse>.Success(ToResponse(user));
+    }
+
+    public async Task<ServiceResult<ResendVerificationResponse>> ResendVerificationAsync(
+        ResendVerificationRequest request,
+        CancellationToken cancellationToken)
+    {
+        // The response is identical whatever happens below — this endpoint must never reveal
+        // whether an address is registered, already verified, or rate limited.
+        var response = new ResendVerificationResponse();
+
+        var email = NormaliseEmail(request.Email);
+        if (email is null)
+        {
+            return ServiceResult<ResendVerificationResponse>.Success(response);
+        }
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+        if (user is null || user.Status != UserStatus.EmailVerificationRequired)
+        {
+            return ServiceResult<ResendVerificationResponse>.Success(response);
+        }
+
+        var since = DateTimeOffset.UtcNow - ResendWindow;
+        var recentCount = await _db.EmailVerificationTokens
+            .CountAsync(t => t.UserId == user.Id && t.CreatedAt >= since, cancellationToken);
+
+        if (recentCount >= MaxResendsPerEmailPerWindow)
+        {
+            return ServiceResult<ResendVerificationResponse>.Success(response);
+        }
+
+        // Prior unused links become invalid the moment a new one is issued.
+        await _db.EmailVerificationTokens
+            .Where(t => t.UserId == user.Id && t.UsedAt == null)
+            .ExecuteUpdateAsync(t => t.SetProperty(x => x.UsedAt, DateTimeOffset.UtcNow), cancellationToken);
+
+        await IssueVerificationEmailAsync(user, cancellationToken);
+
+        return ServiceResult<ResendVerificationResponse>.Success(response);
+    }
+
+    /// <summary>
+    /// Creates and stores a verification token, then emails its link. A failed send does not fail
+    /// the caller — the account still exists and can retry via resend, so this only logs.
+    /// </summary>
+    private async Task IssueVerificationEmailAsync(User user, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var rawToken = EmailVerificationTokenGenerator.Create();
+
+        _db.EmailVerificationTokens.Add(new EmailVerificationToken
+        {
+            UserId = user.Id,
+            TokenHash = EmailVerificationTokenGenerator.Hash(rawToken),
+            ExpiresAt = now.Add(VerificationTokenLifetime),
+            CreatedAt = now
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var link = $"{_emailOptions.BaseUrl.TrimEnd('/')}/verify-email?token={rawToken}";
+
+        var sent = await _email.SendAsync(new EmailMessage
+        {
+            To = user.Email,
+            Subject = "Confirm your FrostWoodTech admin account",
+            HtmlBody =
+                $"<p>Hi {user.FirstName},</p>" +
+                $"<p>Confirm your email address to continue setting up your FrostWoodTech admin account:</p>" +
+                $"<p><a href=\"{link}\">{link}</a></p>" +
+                "<p>This link expires in 24 hours. If you didn't request this account, ignore this email.</p>",
+            TextBody =
+                $"Hi {user.FirstName},\n\n" +
+                "Confirm your email address to continue setting up your FrostWoodTech admin account:\n" +
+                $"{link}\n\n" +
+                "This link expires in 24 hours. If you didn't request this account, ignore this email."
+        }, cancellationToken);
+
+        if (!sent.IsSuccess)
+        {
+            _logger.LogWarning(
+                "Verification email to {Email} could not be sent: {Code}", user.Email, sent.Error!.Code);
+        }
     }
 
     public async Task<ServiceResult<AuthResponse>> LoginAsync(
@@ -428,6 +583,12 @@ public class UserService : IUserService
 
         var user = loaded.Value!;
 
+        if (user.Status != UserStatus.Pending)
+        {
+            return ServiceResult<AdminUserResponse>.Conflict(
+                "user_not_pending", "Only accounts pending approval can be approved.");
+        }
+
         user.Status = UserStatus.Approved;
         user.ApprovedBy = _currentUser.UserId;
         user.ApprovedAt = DateTimeOffset.UtcNow;
@@ -593,6 +754,8 @@ public class UserService : IUserService
     /// <summary>Shared by login and refresh, so both surfaces report account state identically.</summary>
     private static ServiceResult<AuthResponse> NotApproved(User user) => user.Status switch
     {
+        UserStatus.EmailVerificationRequired => ServiceResult<AuthResponse>.Forbidden(
+            "email_verification_required", "Please confirm your email address before signing in."),
         UserStatus.Pending => ServiceResult<AuthResponse>.Forbidden(
             "account_pending", "This account is waiting for super admin approval."),
         UserStatus.Rejected => ServiceResult<AuthResponse>.Forbidden(

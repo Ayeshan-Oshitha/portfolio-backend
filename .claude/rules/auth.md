@@ -12,6 +12,23 @@ paths:
 
 Both public sites are fully anonymous. Only `/api/admin/*` (the CMS) is protected.
 
+## Registration and email verification
+
+`POST /admin/auth/register` creates a `email_verification_required` account and emails a
+verification link (`{Email:BaseUrl}/verify-email?token=...`, 24h expiry, single-use, hashed in
+the DB exactly like a refresh token — see `EmailVerificationToken`/`EmailVerificationTokenGenerator`).
+No token is issued at registration.
+
+`POST /admin/auth/verify-email` consumes the token and moves the account to `pending`. Errors:
+`invalid_verification_token` (unknown token), `verification_token_already_used`,
+`verification_token_expired` — none of these leak whether an email is registered, since the token
+itself already proves inbox possession.
+
+`POST /admin/auth/resend-verification` issues a fresh token, invalidating any prior unused one.
+It **always returns the same generic response** regardless of whether the email exists, is
+already verified, or is rate-limited (3 sends/hour/email) — this endpoint must never be usable to
+enumerate accounts.
+
 ## Password login
 
 Verify Argon2id hash → check `status = approved` → issue an access JWT (15 min) plus a refresh
@@ -23,7 +40,9 @@ React sends the Google ID token → API validates it against Google's JWKS and c
 matches the configured client ID → match the user by `google_subject_id`, falling back to the
 verified email → issue the same JWT pair.
 
-Google sign-in for an email with no user row creates a **`pending`** user. Never auto-approve.
+Google sign-in for an email with no user row creates a **`pending`** user directly — it skips
+`email_verification_required` entirely, since Google has already verified the address. Never
+auto-approve.
 
 ## Tokens
 
@@ -44,11 +63,15 @@ auth system. Authorization is the middleware's job.
 
 ## User states
 
-`status`: `pending | approved | rejected | disabled`.
+`status`: `email_verification_required | pending | approved | rejected | disabled`.
 
 Registration is open but powerless. A non-approved user is **rejected at token issue** with
-`403` and code `account_pending` — do not issue a scopeless token. One place to get it wrong is
-better than two.
+`403` (`NotApproved` in `UserService`) — do not issue a scopeless token. One place to get it
+wrong is better than two. Codes: `email_verification_required`, `account_pending`,
+`account_rejected`, `account_disabled`.
+
+`ApproveAsync` only accepts a `pending` account (`user_not_pending` otherwise) — defense in depth
+so an unverified account can't be approved by a stale admin tab or a direct DB edit.
 
 ## Super admin rules
 

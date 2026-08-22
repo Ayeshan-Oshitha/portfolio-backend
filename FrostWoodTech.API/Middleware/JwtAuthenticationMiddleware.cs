@@ -31,7 +31,10 @@ public sealed class JwtAuthenticationMiddleware : IFunctionsWorkerMiddleware
         "/admin/auth/google",
         // Both must work with a dead access token — that is the whole point of them.
         "/admin/auth/refresh",
-        "/admin/auth/logout"
+        "/admin/auth/logout",
+        // A caller has no token yet at either step of the verification flow.
+        "/admin/auth/verify-email",
+        "/admin/auth/resend-verification"
     ];
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)

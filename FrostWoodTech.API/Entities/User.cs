@@ -33,4 +33,10 @@ public class User : AuditableEntity
     public string? RejectionReason { get; set; }
 
     public DateTimeOffset? LastLoginAt { get; set; }
+
+    /// <summary>
+    /// Set when the verification link is clicked. Kept independent of <see cref="Status"/> so the
+    /// fact survives a later rejection or disable.
+    /// </summary>
+    public DateTimeOffset? EmailVerifiedAt { get; set; }
 }

@@ -25,6 +25,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.ApprovedAt).HasColumnName("approved_at");
         builder.Property(u => u.RejectionReason).HasColumnName("rejection_reason");
         builder.Property(u => u.LastLoginAt).HasColumnName("last_login_at");
+        builder.Property(u => u.EmailVerifiedAt).HasColumnName("email_verified_at");
 
         builder.HasIndex(u => u.Email).IsUnique();
         builder.HasIndex(u => u.GoogleSubjectId).IsUnique();
