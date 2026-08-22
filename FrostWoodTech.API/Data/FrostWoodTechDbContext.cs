@@ -76,7 +76,9 @@ public class FrostWoodTechDbContext : DbContext
                 entity.Property(nameof(AuditableEntity.UpdatedAt)).HasColumnName("updated_at");
                 entity.Property(nameof(AuditableEntity.IsDeleted)).HasColumnName("is_deleted").HasDefaultValue(false);
 
-                // Soft delete must not be forgettable on a read path.
+                // Soft delete must not be forgettable on a read path. Bypass only with
+                // IgnoreQueryFilters, and only where a soft-deleted row must still be found on
+                // purpose (e.g. rejecting a login for a deleted account) — see UserService.
                 entity.HasQueryFilter(BuildNotDeletedFilter(clrType));
             }
 
