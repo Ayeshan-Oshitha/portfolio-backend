@@ -25,8 +25,6 @@ public sealed class PostgresFixture : IAsyncLifetime
     {
         await _container.StartAsync();
 
-        // The same enum mappings Program.cs applies — without them Npgsql cannot read the
-        // native enum columns back.
         var builder = new NpgsqlDataSourceBuilder(_container.GetConnectionString());
         builder.MapEnum<TechCategory>("tech_category");
         builder.MapEnum<PriceType>("price_type");
@@ -40,7 +38,13 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public FrostWoodTechDbContext CreateContext() =>
         new(new DbContextOptionsBuilder<FrostWoodTechDbContext>()
-            .UseNpgsql(_dataSource)
+            .UseNpgsql(_dataSource, npgsql =>
+            {
+                npgsql.MapEnum<TechCategory>("tech_category");
+                npgsql.MapEnum<PriceType>("price_type");
+                npgsql.MapEnum<UserRole>("user_role");
+                npgsql.MapEnum<UserStatus>("user_status");
+            })
             .Options);
 
     public async Task DisposeAsync()

@@ -44,6 +44,13 @@ builder.Services.AddSingleton(dataSource);
 builder.Services.AddDbContextPool<FrostWoodTechDbContext>(options =>
     options.UseNpgsql(dataSource, npgsql =>
     {
+        // Mapping the enums on the data source (above) is not enough on its own — EF Core's
+        // model needs the same mapping declared here too, or it falls back to sending enum
+        // columns as plain integers, which every native enum column in Postgres rejects.
+        npgsql.MapEnum<TechCategory>("tech_category");
+        npgsql.MapEnum<PriceType>("price_type");
+        npgsql.MapEnum<UserRole>("user_role");
+        npgsql.MapEnum<UserStatus>("user_status");
         npgsql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorCodesToAdd: null);
         npgsql.CommandTimeout(30);
     }));
