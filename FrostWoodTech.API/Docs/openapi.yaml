@@ -4,29 +4,23 @@ info:
   title: FrostWoodTech CMS API
   version: "1.0.0"
   description: |
-    One headless CMS API powering three frontends — the FrostWoodTech agency site, the
-    FrostWoodTech personal site, and the admin SPA. There are no duplicated rows per site: every visible entity
-    carries per-site visibility flags and the caller asks for the site it wants.
+    Headless CMS powering three frontends (agency site, personal site, admin SPA) from one
+    database. Entities carry per-site visibility flags instead of duplicated rows.
 
-    ## Two surfaces
+    ## Surfaces
 
-    * `/public/*` — anonymous, read-only, cacheable. Returns only published, non-deleted rows
-      that are visible on the requested site.
-    * `/admin/*` — JWT required, full CRUD, returns drafts and metadata.
+    * `/public/*` — anonymous, read-only, cacheable. Published + non-deleted rows only.
+    * `/admin/*` — JWT required, full CRUD, includes drafts and metadata.
 
     ## Conventions
 
-    * `?site=` is **required** on every public endpoint with site visibility. A missing site is a
-      `400` with code `site_required` — never "return everything".
-    * Lists return `{ items, page, pageSize, total }`. `pageSize` defaults to 20 and is capped
-      at 100.
-    * Errors are RFC 7807 `application/problem+json` with a stable `code`. Match on `code`,
-      never on `detail`.
-    * Public GETs send `Cache-Control: public, max-age=300` and an `ETag`; send
-      `If-None-Match` to get a `304`. Admin responses are `Cache-Control: no-store`.
-    * Timestamps are `timestamptz`, always UTC. Enums travel as their `snake_case` names.
-
-    This document is hand-authored. When a route changes, change it here too.
+    * `?site=` is **required** on public endpoints with site visibility — missing it returns
+      `400 site_required`.
+    * Lists return `{ items, page, pageSize, total }` (`pageSize` defaults to 20, max 100).
+    * Errors are RFC 7807 `application/problem+json` — match on `code`, not `detail`.
+    * Public GETs are cacheable (`ETag` / `If-None-Match`, 5 min); admin responses are
+      `no-store`.
+    * Timestamps are UTC `timestamptz`; enums travel as `snake_case` names.
 
 servers:
   - url: http://localhost:7060/api
@@ -54,9 +48,7 @@ paths:
       tags: [ops]
       operationId: getHealth
       summary: Readiness check
-      description: |
-        Readiness, not liveness — it round-trips to Postgres. Expect roughly a second on the
-        first request after Neon has been idle; that is the documented cold start, not a failure.
+      description: Readiness check that round-trips to Postgres — first request after idle can take ~1s (cold start, not a failure).
       security: []
       responses:
         "200":
@@ -212,10 +204,7 @@ paths:
       tags: [public]
       operationId: getPublicComboPricingPlans
       summary: List combo packs
-      description: |
-        Plans with no owning service (`service_id is null`). This is a separate route rather than
-        an optional `?serviceId=`: absence of a query parameter must never silently change the
-        `where` clause.
+      description: Plans with no owning service (`service_id is null`) — a separate route so a missing query param can never silently change the filter.
       security: []
       parameters:
         - $ref: "#/components/parameters/SiteRequired"
@@ -351,9 +340,7 @@ paths:
       tags: [public]
       operationId: submitReview
       summary: Submit a review
-      description: |
-        The one anonymous public write in the API. Lands with `isPublished = false` — an admin
-        must publish it before it appears anywhere. Rate limited per IP.
+      description: The one anonymous public write in the API — lands unpublished until an admin approves it. Rate limited per IP.
       security: []
       requestBody:
         required: true
@@ -379,10 +366,7 @@ paths:
       tags: [auth]
       operationId: register
       summary: Request an admin account
-      description: |
-        Creates an `email_verification_required` account and sends a verification email.
-        Deliberately returns no token — the address must be verified, then a super admin approves,
-        before sign-in works. Anonymous by design.
+      description: Creates an `email_verification_required` account and emails a verification link. No token returned — verification then super admin approval are both required before sign-in works.
       security: []
       requestBody:
         required: true
@@ -403,10 +387,7 @@ paths:
       tags: [auth]
       operationId: verifyEmail
       summary: Confirm a registered email address
-      description: |
-        Moves a password account from `email_verification_required` to `pending`. Called by the
-        admin SPA's `/verify-email` page with the token from the emailed link. Never issues a
-        token. Anonymous by design.
+      description: Moves a password account from `email_verification_required` to `pending`, using the token from the emailed link. Never issues a sign-in token.
       security: []
       requestBody:
         required: true
@@ -436,10 +417,7 @@ paths:
       tags: [auth]
       operationId: resendVerification
       summary: Resend the verification email
-      description: |
-        Always returns the same generic success, whatever `email` resolves to — an unregistered,
-        already-verified, or rate-limited address gets an identical response, so this endpoint
-        cannot be used to enumerate accounts. Anonymous by design.
+      description: Always returns the same generic success regardless of `email` — prevents using this endpoint to enumerate accounts.
       security: []
       requestBody:
         required: true
@@ -469,10 +447,7 @@ paths:
         "200": { $ref: "#/components/responses/Auth" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401":
-          description: |
-            Bad credentials (`invalid_credentials`), an account still awaiting email verification
-            (`email_verification_required`), still awaiting approval (`account_pending`), or one
-            that was rejected or disabled.
+          description: Bad credentials, or the account is unverified, pending, rejected, or disabled — see `code`.
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
@@ -764,10 +739,7 @@ paths:
       tags: [admin]
       operationId: addProjectImage
       summary: Attach an uploaded image
-      description: |
-        Called after the browser has uploaded straight to Neon Object Storage using a presigned URL from
-        `/admin/media/presigned-upload`. Image bytes never reach this API. `altText` is required, and
-        setting `isPrimary` clears the previous primary in the same transaction.
+      description: Called after the browser uploads straight to Neon Object Storage via a presigned URL — image bytes never reach this API. `altText` is required; setting `isPrimary` clears the previous one.
       parameters: [{ $ref: "#/components/parameters/IdPath" }]
       requestBody:
         required: true
@@ -810,9 +782,7 @@ paths:
       tags: [admin]
       operationId: deleteProjectImage
       summary: Remove an image
-      description: |
-        The one hard delete that exists today. The Neon Object Storage asset is destroyed after the row is
-        committed; a failed destroy is logged, not surfaced.
+      description: The one hard delete that exists today — the Neon Object Storage asset is destroyed after the row is committed; a failed destroy is only logged.
       parameters:
         - $ref: "#/components/parameters/IdPath"
         - $ref: "#/components/parameters/ImageIdPath"
@@ -1144,8 +1114,7 @@ paths:
       tags: [admin]
       operationId: getAdminPricingPlans
       summary: List pricing plans, drafts included
-      description: |
-        `serviceId` and `comboOnly` are explicit filters; with neither, the list is everything.
+      description: "`serviceId` and `comboOnly` are explicit filters; with neither, the list is everything."
       parameters:
         - $ref: "#/components/parameters/SiteRequired"
         - name: serviceId
@@ -1565,9 +1534,7 @@ paths:
       tags: [admin]
       operationId: createTag
       summary: Create a tag
-      description: |
-        A technology tag (`isTechnology: true`) requires `technologyCategory` and an icon; a
-        category tag must have neither.
+      description: A technology tag requires `technologyCategory` and an icon; a category tag must have neither.
       requestBody:
         required: true
         content:
@@ -1627,10 +1594,7 @@ paths:
       tags: [admin]
       operationId: createPresignedUpload
       summary: Presign a direct-to-Neon-Object-Storage upload
-      description: |
-        Image bytes never reach this API. The browser PUTs the file straight to Neon Object
-        Storage using the returned URL, then calls the entity's image endpoint with the
-        `objectKey`, dimensions and alt text.
+      description: Image bytes never reach this API — the browser PUTs straight to Neon Object Storage with the returned URL, then the entity's image endpoint is called with `objectKey`, dimensions and alt text.
 
         The client sends a `target` rather than a folder path, so a stolen admin token cannot
         write anywhere else in the bucket. `slug` is required when the target is `projects` or
@@ -1655,10 +1619,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: |
-        The `accessToken` from `/admin/auth/login`, `/admin/auth/google` or `/admin/auth/refresh`,
-        sent as `Authorization: Bearer <token>`. Validated in middleware for everything under
-        `/admin/*` except the register, login, google, refresh and logout routes.
+      description: "The `accessToken` from login/google/refresh, sent as `Authorization: Bearer <token>`. Required on all `/admin/*` routes except register, login, google, refresh and logout."
 
   headers:
     ETag:
@@ -1673,10 +1634,7 @@ components:
       name: site
       in: query
       required: true
-      description: |
-        Which frontend is asking. Required — a missing site is a `400` with code `site_required`,
-        never "return everything". This is the guard that stops personal content appearing on the
-        agency site.
+      description: "Which frontend is asking. Required — missing it is `400 site_required`, never \"return everything\"."
       schema: { $ref: "#/components/schemas/Site" }
     Page:
       name: page
@@ -1748,8 +1706,7 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     SiteRequired:
-      description: |
-        `?site=` was missing (`site_required`) or was not a known site (`validation_failed`).
+      description: "`?site=` was missing (`site_required`) or invalid (`validation_failed`)."
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -1769,8 +1726,7 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     Conflict:
-      description: |
-        The change collides with existing data — `slug_taken`, `tag_in_use`, `email_taken`.
+      description: "The change collides with existing data — `slug_taken`, `tag_in_use`, `email_taken`."
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -1917,8 +1873,7 @@ components:
     # -------------------------------------------------------------------------- envelope
     Problem:
       type: object
-      description: |
-        RFC 7807. Switch on `code`, which is stable; `detail` is human-readable and may change.
+      description: "RFC 7807. Switch on `code` (stable) — `detail` is human-readable and may change."
       properties:
         type: { type: string }
         title: { type: string, examples: ["Bad Request"] }
@@ -1926,9 +1881,7 @@ components:
         detail: { type: string }
         code:
           type: string
-          description: |
-            Stable machine-readable code — `site_required`, `validation_failed`, `slug_taken`,
-            `tag_in_use`, `account_pending`, `invalid_credentials`, and so on.
+          description: "Stable machine-readable code, e.g. `site_required`, `validation_failed`, `slug_taken`, `tag_in_use`."
           examples: [site_required]
       required: [status, title, code]
 
@@ -1962,9 +1915,7 @@ components:
 
     ProjectImageResponse:
       type: object
-      description: |
-        The API stores the Neon Object Storage `objectKey` plus dimensions and alt text — never
-        image bytes.
+      description: "The API stores the Neon Object Storage `objectKey` plus dimensions and alt text — never image bytes."
       properties:
         id: { type: string, format: uuid }
         objectKey: { type: string, examples: ["frostwoodtech/projects/acme-site/hero"] }
@@ -2167,9 +2118,7 @@ components:
     # ------------------------------------------------------------------- shared fragments
     SiteVisibility:
       type: object
-      description: |
-        Per-site visibility, the reason there is one row per entity rather than one per site.
-        `featuredOn*` requires the matching `showOn*`.
+      description: "Per-site visibility — why there's one row per entity, not one per site. `featuredOn*` requires the matching `showOn*`."
       properties:
         showOnAgency: { type: boolean, default: false }
         featuredOnAgency: { type: boolean, default: false }
@@ -2452,9 +2401,7 @@ components:
 
     ChildReorderRequest:
       type: object
-      description: |
-        Reordering a parent's children — images or features. No `site`: children are not
-        site-scoped.
+      description: "Reordering a parent's children — images or features. No `site`: children aren't site-scoped."
       properties:
         items:
           type: array
@@ -2472,9 +2419,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/SiteVisibility"
         - type: object
-          description: |
-            Also used for `PUT` — an update is a full replacement. Omit `slug` to have one
-            generated from the title; a published project's slug should stay put.
+          description: "Also used for `PUT` (full replacement). Omit `slug` to generate one from the title — a published project's slug should stay put."
           properties:
             title: { type: string }
             slug: { type: string }
@@ -2602,9 +2547,7 @@ components:
 
     CreateReviewRequest:
       type: object
-      description: |
-        Also used for `PUT` — an update is a full replacement. For an admin manually adding a
-        testimonial collected elsewhere; not what the public submission endpoint uses.
+      description: "Also used for `PUT` (full replacement). For an admin manually adding a testimonial collected elsewhere — not what the public submission endpoint uses."
       properties:
         name: { type: string }
         country: { type: string }
@@ -2619,9 +2562,7 @@ components:
 
     CreateTagRequest:
       type: object
-      description: |
-        Also used for `PUT`. A technology tag requires `technologyCategory` and an icon; a
-        category tag must have neither.
+      description: "Also used for `PUT`. A technology tag requires `technologyCategory` and an icon; a category tag must have neither."
       properties:
         name: { type: string }
         slug: { type: string }
@@ -2635,9 +2576,7 @@ components:
 
     AddProjectImageRequest:
       type: object
-      description: |
-        Also used for `PUT`. Sent after the browser has uploaded to Neon Object Storage — the API stores
-        the `objectKey`, dimensions and alt text, never the bytes.
+      description: "Also used for `PUT`. Sent after the browser uploads to Neon Object Storage — the API stores `objectKey`, dimensions and alt text, never the bytes."
       properties:
         objectKey: { type: string }
         url: { type: string, format: uri }
@@ -2678,9 +2617,7 @@ components:
         target: { $ref: "#/components/schemas/MediaTarget" }
         slug:
           type: string
-          description: |
-            Required when `target` is `projects` or `articles`. Re-slugged server-side, so
-            nothing outside the base folder is reachable.
+          description: Required when `target` is `projects` or `articles`. Re-slugged server-side, so nothing outside the base folder is reachable.
         objectKey:
           type: string
           description: Overwrite a specific object instead of creating a new one.
