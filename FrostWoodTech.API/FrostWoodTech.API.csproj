@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="local.settings.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The hand-authored API contract, served by GetOpenApiSpec. -->
     <EmbeddedResource Include="Docs\openapi.yaml" />
   </ItemGroup>

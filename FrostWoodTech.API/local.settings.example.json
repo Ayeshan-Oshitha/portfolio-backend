@@ -17,17 +17,14 @@
     "NeonS3__SecretKey": "<neon-s3-secret-key>",
     "NeonS3__Region": "<neon-s3-region>",
     "NeonS3__BucketName": "<neon-s3-bucket-name>",
-    "NeonS3__BaseFolder": "<neon-s3-base-folder>",
     "Google__ClientId": "<google-oauth-client-id>.apps.googleusercontent.com",
-    "Email__Provider": "<email-provider>",
+    "Email__Provider": "brevo",
     "Email__FromAddress": "<no-reply@your-domain>",
     "Email__FromName": "<email-from-name>",
-    "Email__ApiKey": "<provider-api-key>",
+    "Email__ApiKey": "<brevo-api-key>",
     "Email__BaseUrl": "<email-base-url>",
     "Docs__Enabled": "<docs-enabled>",
-    "Cors__AllowedOrigins__0": "<cors-allowed-origin-0>",
-    "Cors__AllowedOrigins__1": "<cors-allowed-origin-1>",
-    "Cors__AllowedOrigins__2": "<cors-allowed-origin-2>"
+    "Cors__AllowedOrigins": "<comma-separated-cors-allowed-origins>"
   },
   "ConnectionStrings": {
     "Default": "<connection-string>"

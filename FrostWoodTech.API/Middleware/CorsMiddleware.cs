@@ -38,7 +38,7 @@ public sealed class CorsMiddleware : IFunctionsWorkerMiddleware
         // Only ever echo an origin we were configured with — no wildcard, no reflection of
         // whatever the caller sent.
         var allowed = !string.IsNullOrEmpty(origin)
-            && _options.AllowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase);
+            && _options.Origins.Contains(origin, StringComparer.OrdinalIgnoreCase);
 
         if (allowed)
         {

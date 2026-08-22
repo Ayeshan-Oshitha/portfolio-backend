@@ -104,9 +104,10 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection("Cors"));
 
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
-// The logging transport sends nothing. A real provider (Resend, SES) replaces this line with a
-// typed client — AddHttpClient<IEmailService, ResendEmailService>() — and nothing else changes.
-builder.Services.AddScoped<IEmailService, LoggingEmailService>();
+builder.Services.AddHttpClient<IEmailService, BrevoEmailService>(client =>
+{
+    client.BaseAddress = new Uri("https://api.brevo.com/v3/");
+});
 
 // /api/docs and /api/openapi.yaml, both 404 unless Docs__Enabled is set.
 builder.Services.Configure<DocsOptions>(builder.Configuration.GetSection("Docs"));

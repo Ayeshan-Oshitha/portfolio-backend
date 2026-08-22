@@ -6,8 +6,9 @@ namespace FrostWoodTech.API.Email;
 public sealed class EmailOptions
 {
     /// <summary>
-    /// Which transport to use. Only <c>log</c> exists today; a Resend or SES adapter reads the
-    /// same section, so switching providers is a settings change plus one DI line.
+    /// Which transport to use. <c>brevo</c> is the real path; <c>log</c> (the default, for local
+    /// dev without a Brevo key) just writes the message to the log instead of sending it. A
+    /// future provider reads the same section, so switching is a settings change plus one DI line.
     /// </summary>
     public string Provider { get; set; } = "log";
 
@@ -20,8 +21,8 @@ public sealed class EmailOptions
     public string FromName { get; set; } = "FrostWoodTech";
 
     /// <summary>
-    /// Provider credential. Unused by the logging transport, and lives in app settings /
-    /// Key Vault, never in a committed file.
+    /// Provider credential — the Brevo API key. Unused by the logging transport, and lives in app
+    /// settings / Key Vault, never in a committed file.
     /// </summary>
     public string ApiKey { get; set; } = string.Empty;
 
