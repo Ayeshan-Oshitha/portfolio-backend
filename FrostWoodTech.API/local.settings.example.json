@@ -9,7 +9,6 @@
     "Jwt__AccessTokenMinutes": "<jwt-access-token-minutes>",
     "Jwt__RefreshTokenDays": "<jwt-refresh-token-days>",
     "SuperAdmin__Email": "<super-admin-email>",
-    "SuperAdmin__Password": "<super-admin-password-at-least-8-chars>",
     "SuperAdmin__FirstName": "<super-admin-first-name>",
     "SuperAdmin__LastName": "<super-admin-last-name>",
     "NeonS3__Endpoint": "<neon-s3-endpoint>",

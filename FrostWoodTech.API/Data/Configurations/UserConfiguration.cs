@@ -30,6 +30,14 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(u => u.Email).IsUnique();
         builder.HasIndex(u => u.GoogleSubjectId).IsUnique();
 
+        // auth.md: exactly one super admin, ever — backs the seeder's advisory lock. `role` is
+        // the native enum `user_role` with snake_case labels, so the filter targets 'super_admin',
+        // not 0 or 'SuperAdmin'.
+        builder.HasIndex(u => u.Role)
+            .IsUnique()
+            .HasFilter("\"role\" = 'super_admin'")
+            .HasDatabaseName("ix_users_single_super_admin");
+
         builder.HasOne(u => u.ApprovedByUser)
             .WithMany()
             .HasForeignKey(u => u.ApprovedBy)

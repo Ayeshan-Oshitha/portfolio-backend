@@ -45,6 +45,8 @@ public class FrostWoodTechDbContext : DbContext
 
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
 
+    public DbSet<PasswordToken> PasswordTokens => Set<PasswordToken>();
+
     public DbSet<LoginAttempt> LoginAttempts => Set<LoginAttempt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -59,6 +61,8 @@ public class FrostWoodTechDbContext : DbContext
         modelBuilder.HasPostgresEnum<PriceType>(name: "price_type");
         modelBuilder.HasPostgresEnum<UserRole>(name: "user_role");
         modelBuilder.HasPostgresEnum<UserStatus>(name: "user_status");
+        modelBuilder.HasPostgresEnum<PasswordTokenPurpose>(name: "password_token_purpose");
+        modelBuilder.HasPostgresEnum<AuthAttemptAction>(name: "auth_attempt_action");
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(FrostWoodTechDbContext).Assembly);
 

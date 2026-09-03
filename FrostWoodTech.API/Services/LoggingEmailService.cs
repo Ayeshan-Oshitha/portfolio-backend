@@ -15,9 +15,6 @@ namespace FrostWoodTech.API.Services;
 /// </summary>
 public class LoggingEmailService : IEmailService
 {
-    /// <summary>Enough of the body to recognise the mail in a log, not enough to fill it.</summary>
-    private const int BodyPreviewLength = 200;
-
     private readonly EmailOptions _options;
     private readonly ILogger<LoggingEmailService> _logger;
 
@@ -39,11 +36,13 @@ public class LoggingEmailService : IEmailService
             return Task.FromResult(validation);
         }
 
+        // Logged in full — a truncated verification or setup link is useless. Local dev/CI only;
+        // never select this transport in a deployment, or tokens end up in the log store.
         _logger.LogInformation(
-            "Email not sent (provider 'log'). To: {To}, Subject: {Subject}, Body: {BodyPreview}",
+            "Email not sent (provider 'log'). To: {To}, Subject: {Subject}\n{Body}",
             message.To,
             message.Subject,
-            Preview(message.TextBody ?? message.HtmlBody));
+            message.TextBody ?? message.HtmlBody);
 
         return Task.FromResult(ServiceResult<EmailSendResult>.Success(new EmailSendResult
         {
@@ -77,7 +76,4 @@ public class LoggingEmailService : IEmailService
             ? ServiceResult<EmailSendResult>.Validation("htmlBody is required.")
             : null;
     }
-
-    private static string Preview(string body) =>
-        body.Length <= BodyPreviewLength ? body : body[..BodyPreviewLength] + "…";
 }

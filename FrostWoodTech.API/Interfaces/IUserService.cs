@@ -34,6 +34,29 @@ public interface IUserService
         ResendVerificationRequest request,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Issues a password reset link. Always the same generic success, whatever the address
+    /// resolves to, so this cannot be used to probe which addresses have accounts. Invalidates
+    /// any outstanding unused reset link first, so only the newest one works.
+    /// </summary>
+    /// <param name="ipAddress">
+    /// The caller's address, for rate limiting. Null when it cannot be determined — the per-email
+    /// limit still applies.
+    /// </param>
+    Task<ServiceResult<ForgotPasswordResponse>> ForgotPasswordAsync(
+        ForgotPasswordRequest request,
+        string? ipAddress,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Redeems an emailed password link — setup or reset, consumed identically. Single-use:
+    /// invalidates any other outstanding link for the user and revokes every refresh token.
+    /// Never issues a token itself.
+    /// </summary>
+    Task<ServiceResult<AdminUserResponse>> SetPasswordAsync(
+        SetPasswordRequest request,
+        CancellationToken cancellationToken);
+
     /// <param name="ipAddress">
     /// The caller's address, for rate limiting. Null when it cannot be determined — the per-email
     /// limit still applies.

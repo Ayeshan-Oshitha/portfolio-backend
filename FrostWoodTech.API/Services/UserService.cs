@@ -23,6 +23,9 @@ public class UserService : IUserService
 
     private static readonly TimeSpan VerificationTokenLifetime = TimeSpan.FromHours(24);
 
+    /// <summary>Shorter than the 24h bootstrap link — a reset is used within minutes.</summary>
+    private static readonly TimeSpan ResetTokenLifetime = TimeSpan.FromHours(1);
+
     private static readonly TimeSpan ResendWindow = TimeSpan.FromHours(1);
 
     private const int MaxResendsPerEmailPerWindow = 3;
@@ -256,6 +259,174 @@ public class UserService : IUserService
         }
     }
 
+    public async Task<ServiceResult<ForgotPasswordResponse>> ForgotPasswordAsync(
+        ForgotPasswordRequest request,
+        string? ipAddress,
+        CancellationToken cancellationToken)
+    {
+        // Every branch below returns the same response — unknown address, wrong status, rate
+        // limited, mail failure — so this endpoint can't be used to probe which addresses exist.
+        var response = new ForgotPasswordResponse();
+        var success = ServiceResult<ForgotPasswordResponse>.Success(response);
+
+        var email = NormaliseEmail(request.Email);
+        if (email is null)
+        {
+            return success;
+        }
+
+        if (await _rateLimiter.IsBlockedAsync(
+                email, ipAddress, AuthAttemptAction.PasswordReset, cancellationToken))
+        {
+            _logger.LogInformation("Password reset for {Email} refused: rate limited.", email);
+
+            return success;
+        }
+
+        await _rateLimiter.RecordAttemptAsync(
+            email, ipAddress, AuthAttemptAction.PasswordReset, cancellationToken);
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+
+        if (user is null)
+        {
+            _logger.LogInformation("Password reset requested for {Email}, which has no account.", email);
+
+            return success;
+        }
+
+        // Only pending/approved accounts get a link — an unverified account has its own resend
+        // flow, and a rejected or disabled one must not be handed a fresh credential.
+        if (user.Status is not (UserStatus.Pending or UserStatus.Approved))
+        {
+            _logger.LogInformation(
+                "Password reset for {Email} skipped: status is {Status}.", email, user.Status);
+
+            return success;
+        }
+
+        // Invalidate first, so only the newest link ever works.
+        await _db.PasswordTokens
+            .Where(t => t.UserId == user.Id
+                && t.Purpose == PasswordTokenPurpose.Reset
+                && t.UsedAt == null)
+            .ExecuteUpdateAsync(t => t.SetProperty(x => x.UsedAt, DateTimeOffset.UtcNow), cancellationToken);
+
+        var now = DateTimeOffset.UtcNow;
+        var rawToken = EmailVerificationTokenGenerator.Create();
+
+        _db.PasswordTokens.Add(new PasswordToken
+        {
+            UserId = user.Id,
+            TokenHash = EmailVerificationTokenGenerator.Hash(rawToken),
+            Purpose = PasswordTokenPurpose.Reset,
+            ExpiresAt = now.Add(ResetTokenLifetime),
+            CreatedAt = now
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var link = $"{_emailOptions.BaseUrl.TrimEnd('/')}/set-password?token={rawToken}";
+
+        var sent = await _email.SendAsync(new EmailMessage
+        {
+            To = user.Email,
+            Subject = "Reset your FrostWoodTech password",
+            HtmlBody =
+                $"<p>Hi {user.FirstName},</p>" +
+                "<p>Somebody asked to reset the password for your FrostWoodTech admin account. Choose a new one here:</p>" +
+                $"<p><a href=\"{link}\">{link}</a></p>" +
+                "<p>This link expires in 1 hour and can only be used once. Setting a new password signs you out everywhere else.</p>" +
+                "<p>If this wasn't you, ignore this email — your password has not changed.</p>",
+            TextBody =
+                $"Hi {user.FirstName},\n\n" +
+                "Somebody asked to reset the password for your FrostWoodTech admin account. Choose a new one here:\n" +
+                $"{link}\n\n" +
+                "This link expires in 1 hour and can only be used once. Setting a new password signs you out everywhere else.\n\n" +
+                "If this wasn't you, ignore this email — your password has not changed."
+        }, cancellationToken);
+
+        if (!sent.IsSuccess)
+        {
+            _logger.LogWarning(
+                "Password reset email to {Email} could not be sent: {Code}", user.Email, sent.Error!.Code);
+        }
+
+        return success;
+    }
+
+    public async Task<ServiceResult<AdminUserResponse>> SetPasswordAsync(
+        SetPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (Blank(request.Token) is not { } rawToken)
+        {
+            return ServiceResult<AdminUserResponse>.Validation("A token is required.");
+        }
+
+        var validationError = ValidatePassword(request.Password, request.ConfirmPassword, "Password");
+        if (validationError is not null)
+        {
+            return ServiceResult<AdminUserResponse>.Validation(validationError);
+        }
+
+        var hash = EmailVerificationTokenGenerator.Hash(rawToken);
+
+        var token = await _db.PasswordTokens
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken);
+
+        // Distinct codes are safe here, same as verify-email: reaching any of them already
+        // requires holding a token, so none reveals whether an address has an account.
+        if (token is null)
+        {
+            _logger.LogInformation("Password link rejected: no token matches the presented value.");
+
+            return ServiceResult<AdminUserResponse>.NotFound(
+                "invalid_setup_token", "This password link is not valid.");
+        }
+
+        if (token.UsedAt is not null)
+        {
+            _logger.LogInformation(
+                "{Purpose} link for {UserId} rejected: already used at {UsedAt}.",
+                token.Purpose, token.UserId, token.UsedAt);
+
+            return ServiceResult<AdminUserResponse>.Conflict(
+                "setup_token_already_used", "This link has already been used.");
+        }
+
+        if (token.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            _logger.LogInformation(
+                "{Purpose} link for {UserId} rejected: expired at {ExpiresAt}.",
+                token.Purpose, token.UserId, token.ExpiresAt);
+
+            return ServiceResult<AdminUserResponse>.Conflict(
+                "setup_token_expired", "This link has expired.");
+        }
+
+        var user = token.User;
+
+        user.PasswordHash = PasswordHasher.Hash(request.Password!);
+        token.UsedAt = DateTimeOffset.UtcNow;
+
+        // Any other unused link for this user, of either purpose, is now a pure liability.
+        await _db.PasswordTokens
+            .Where(t => t.UserId == user.Id && t.UsedAt == null && t.Id != token.Id)
+            .ExecuteUpdateAsync(t => t.SetProperty(x => x.UsedAt, DateTimeOffset.UtcNow), cancellationToken);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        // Same as ChangePasswordAsync: a new password ends every session that predates it.
+        await RevokeAllForUserAsync(user.Id, cancellationToken);
+
+        _logger.LogInformation(
+            "{Purpose} link redeemed for {UserId}. All refresh tokens revoked.", token.Purpose, user.Id);
+
+        return ServiceResult<AdminUserResponse>.Success(ToResponse(user));
+    }
+
     public async Task<ServiceResult<AuthResponse>> LoginAsync(
         LoginRequest request,
         string? ipAddress,
@@ -271,7 +442,7 @@ public class UserService : IUserService
 
         // Checked before the password so a blocked caller costs an index lookup rather than an
         // Argon2 hash — otherwise the throttle is itself the cheapest way to burn the CPU.
-        if (await _rateLimiter.IsBlockedAsync(email, ipAddress, cancellationToken))
+        if (await _rateLimiter.IsBlockedAsync(email, ipAddress, AuthAttemptAction.Login, cancellationToken))
         {
             return ServiceResult<AuthResponse>.Unauthorized(
                 "too_many_attempts",
@@ -285,14 +456,24 @@ public class UserService : IUserService
             // Same work, same answer as a wrong password: the response must not reveal whether
             // the account exists.
             PasswordHasher.BurnVerifyTime(password);
-            await _rateLimiter.RecordFailureAsync(email, ipAddress, cancellationToken);
+            await _rateLimiter.RecordAttemptAsync(email, ipAddress, AuthAttemptAction.Login, cancellationToken);
+
+            return InvalidCredentials();
+        }
+
+        // Google-only accounts and an un-redeemed super admin have no hash — never hand null to
+        // the hasher. Same burn-and-fail treatment as a wrong password.
+        if (string.IsNullOrEmpty(user.PasswordHash))
+        {
+            PasswordHasher.BurnVerifyTime(password);
+            await _rateLimiter.RecordAttemptAsync(email, ipAddress, AuthAttemptAction.Login, cancellationToken);
 
             return InvalidCredentials();
         }
 
         if (!PasswordHasher.Verify(user.PasswordHash, password))
         {
-            await _rateLimiter.RecordFailureAsync(email, ipAddress, cancellationToken);
+            await _rateLimiter.RecordAttemptAsync(email, ipAddress, AuthAttemptAction.Login, cancellationToken);
 
             return InvalidCredentials();
         }
@@ -308,7 +489,7 @@ public class UserService : IUserService
 
         // A successful sign-in clears the slate, so earlier fumbled attempts do not count
         // towards a later lockout.
-        await _rateLimiter.ClearAsync(email, cancellationToken);
+        await _rateLimiter.ClearAsync(email, AuthAttemptAction.Login, cancellationToken);
 
         var (response, _) = await IssueTokensAsync(user, cancellationToken);
 
@@ -512,7 +693,9 @@ public class UserService : IUserService
             return ServiceResult<bool>.Unauthorized("unauthenticated", "This account no longer exists.");
         }
 
-        if (string.IsNullOrEmpty(request.CurrentPassword)
+        // No password means nothing to "change" — that's what the setup link is for.
+        if (string.IsNullOrEmpty(user.PasswordHash)
+            || string.IsNullOrEmpty(request.CurrentPassword)
             || !PasswordHasher.Verify(user.PasswordHash, request.CurrentPassword))
         {
             return ServiceResult<bool>.Unauthorized("invalid_credentials", "The current password is incorrect.");

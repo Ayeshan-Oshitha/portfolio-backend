@@ -328,12 +328,12 @@ public class EmailVerificationTests
 
     private sealed class FakeLoginRateLimiter : ILoginRateLimiter
     {
-        public Task<bool> IsBlockedAsync(string email, string? ipAddress, CancellationToken cancellationToken) =>
+        public Task<bool> IsBlockedAsync(string email, string? ipAddress, AuthAttemptAction action, CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
-        public Task RecordFailureAsync(string email, string? ipAddress, CancellationToken cancellationToken) =>
+        public Task RecordAttemptAsync(string email, string? ipAddress, AuthAttemptAction action, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
-        public Task ClearAsync(string email, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task ClearAsync(string email, AuthAttemptAction action, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

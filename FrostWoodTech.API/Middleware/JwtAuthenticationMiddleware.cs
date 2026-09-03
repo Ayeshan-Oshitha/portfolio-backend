@@ -34,7 +34,10 @@ public sealed class JwtAuthenticationMiddleware : IFunctionsWorkerMiddleware
         "/admin/auth/logout",
         // A caller has no token yet at either step of the verification flow.
         "/admin/auth/verify-email",
-        "/admin/auth/resend-verification"
+        "/admin/auth/resend-verification",
+        // Neither has a token yet either, by definition.
+        "/admin/auth/forgot-password",
+        "/admin/auth/set-password"
     ];
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)

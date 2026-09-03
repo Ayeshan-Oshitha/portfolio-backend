@@ -63,6 +63,8 @@ POST   /api/admin/auth/google           # Google ID token exchange
 POST   /api/admin/auth/register
 POST   /api/admin/auth/verify-email          # body { token }, moves email_verification_required -> pending
 POST   /api/admin/auth/resend-verification   # body { email }, always returns the same generic response
+POST   /api/admin/auth/forgot-password  # body { email }, always returns the same generic response
+POST   /api/admin/auth/set-password     # body { token, password, confirmPassword }, single-use link
 POST   /api/admin/auth/refresh         # body { refreshToken }, rotates
 POST   /api/admin/auth/logout          # body { refreshToken }, revokes it
 
