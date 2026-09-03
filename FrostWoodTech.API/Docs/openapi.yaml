@@ -2698,5 +2698,9 @@ components:
       properties:
         uploadUrl: { type: string, format: uri }
         objectKey: { type: string, examples: ["frostwoodtech/projects/acme-site/hero"] }
+        publicUrl:
+          type: string
+          format: uri
+          description: Where the object is readable once the PUT completes — the endpoint and bucket live only in server config, so the caller cannot build this itself.
         expiresAt: { type: string, format: date-time }
-      required: [uploadUrl, objectKey, expiresAt]
+      required: [uploadUrl, objectKey, publicUrl, expiresAt]

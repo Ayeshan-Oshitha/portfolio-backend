@@ -11,5 +11,11 @@ public sealed class PresignedUploadResponse
     /// <summary>The key the object will live at once uploaded — send this back with the metadata request.</summary>
     public required string ObjectKey { get; init; }
 
+    /// <summary>
+    /// Where the object is readable once the PUT completes. Returned because the SPA has no other
+    /// way to build it — the endpoint and bucket live only in server configuration.
+    /// </summary>
+    public required string PublicUrl { get; init; }
+
     public required DateTimeOffset ExpiresAt { get; init; }
 }

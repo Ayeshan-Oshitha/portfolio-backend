@@ -72,6 +72,7 @@ public class NeonStorageService : IMediaService
         {
             UploadUrl = uploadUrl,
             ObjectKey = objectKey,
+            PublicUrl = GetPublicUrl(objectKey),
             ExpiresAt = expiresAt
         });
     }
