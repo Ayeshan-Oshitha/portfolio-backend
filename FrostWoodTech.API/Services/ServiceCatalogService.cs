@@ -28,8 +28,7 @@ public class ServiceCatalogService : IServiceCatalogService
         int pageSize,
         CancellationToken cancellationToken)
     {
-        // is_deleted is handled by the DbContext's global filter; is_published and the site flag
-        // are applied here and are not optional.
+        // is_deleted comes from the global query filter; is_published and the site flag are not optional.
         var query = ForSite(_db.Services.AsNoTracking().Where(s => s.IsPublished), site);
 
         if (featured is not null)
@@ -171,8 +170,7 @@ public class ServiceCatalogService : IServiceCatalogService
         _db.Services.Add(service);
         await _db.SaveChangesAsync(cancellationToken);
 
-        // Re-read so the response carries the feature list the projection builds — empty here,
-        // but the shape stays the same as every other admin read.
+        // Re-read so the response shape matches every other admin read (feature list empty here).
         return await GetByIdAsync(service.Id, cancellationToken);
     }
 

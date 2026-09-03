@@ -38,10 +38,15 @@ public static class SuperAdminSeeder
         }
 
         var address = options.Email.Trim().ToLowerInvariant();
-        string rawToken;
+        string? rawToken = null;
 
-        await using (var transaction = await db.Database.BeginTransactionAsync(cancellationToken))
+        // Retry-on-failure needs the strategy to own the whole retriable unit — EF Core rejects a
+        // user-started transaction otherwise.
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
             // Held until the transaction ends, making the lookups and insert below atomic.
             await db.Database.ExecuteSqlRawAsync(
                 "SELECT pg_advisory_xact_lock({0})", [AdvisoryLockKey], cancellationToken);
@@ -66,8 +71,7 @@ public static class SuperAdminSeeder
                 return;
             }
 
-            // Seed-if-missing only — an address already owned by someone else is a job for a
-            // human, not a seeder that would have to overwrite a real account's role.
+            // Seed-if-missing only — an address owned by someone else is a job for a human.
             var addressTaken = await db.Users
                 .IgnoreQueryFilters()
                 .AnyAsync(u => u.Email == address, cancellationToken);
@@ -90,13 +94,11 @@ public static class SuperAdminSeeder
                 Email = address,
                 FirstName = options.FirstName,
                 LastName = options.LastName,
-                // Unreachable by password login until the emailed link is redeemed — LoginAsync
-                // rejects a null hash outright.
+                // Unreachable by password login until the link is redeemed — LoginAsync rejects a null hash.
                 PasswordHash = null,
                 Role = UserRole.SuperAdmin,
                 Status = UserStatus.Approved,
-                // Trusted config, not user input, so nothing to verify — and leaving this unset
-                // would leave Status at EmailVerificationRequired, blocking login even post-setup.
+                // Trusted config, nothing to verify — and unset would leave Status blocking login post-setup.
                 EmailVerifiedAt = now
             };
 
@@ -117,12 +119,12 @@ public static class SuperAdminSeeder
             }
             catch (DbUpdateException ex)
             {
-                // The advisory lock covers the common race; the unique indexes on email and on
-                // role='super_admin' catch anything else. Either way the account now exists, so
-                // don't send a link for a token that just rolled back.
+                // The advisory lock covers the common race, the unique indexes catch the rest. Either
+                // way the account now exists, so don't send a link for a token that rolled back.
                 logger.LogWarning(
                     ex, "Super admin seeding lost a race — the account already exists. No mail sent.");
 
+                rawToken = null;
                 await transaction.RollbackAsync(cancellationToken);
                 return;
             }
@@ -130,10 +132,14 @@ public static class SuperAdminSeeder
             // Warning, not Information: should happen exactly once per deployment.
             logger.LogWarning(
                 "Seeded the super admin account {Email} with no password. Sending a setup link.", address);
-        }
+        });
 
-        await SendSetupLinkAsync(
-            email, emailOptions, address, options.FirstName, rawToken, logger, cancellationToken);
+        // Null means the body returned early (already seeded, address taken, race lost) — no mail.
+        if (rawToken is not null)
+        {
+            await SendSetupLinkAsync(
+                email, emailOptions, address, options.FirstName, rawToken, logger, cancellationToken);
+        }
     }
 
     /// <summary>Called after the commit, so a slow mail provider can't hold the transaction open.</summary>

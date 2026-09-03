@@ -111,8 +111,7 @@ public class UserService : IUserService
             FirstName = firstName!,
             LastName = lastName!,
             PasswordHash = PasswordHasher.Hash(request.Password!),
-            // Registration is open but powerless: no token until the address is verified and the
-            // super admin approves.
+            // Open but powerless: no token until verified and approved.
             Role = UserRole.Admin,
             Status = UserStatus.EmailVerificationRequired
         };
@@ -180,8 +179,7 @@ public class UserService : IUserService
         ResendVerificationRequest request,
         CancellationToken cancellationToken)
     {
-        // The response is identical whatever happens below — this endpoint must never reveal
-        // whether an address is registered, already verified, or rate limited.
+        // Identical response on every branch — no account enumeration.
         var response = new ResendVerificationResponse();
 
         var email = NormaliseEmail(request.Email);
@@ -264,8 +262,7 @@ public class UserService : IUserService
         string? ipAddress,
         CancellationToken cancellationToken)
     {
-        // Every branch below returns the same response — unknown address, wrong status, rate
-        // limited, mail failure — so this endpoint can't be used to probe which addresses exist.
+        // Identical response on every branch — no account enumeration.
         var response = new ForgotPasswordResponse();
         var success = ServiceResult<ForgotPasswordResponse>.Success(response);
 
@@ -295,8 +292,8 @@ public class UserService : IUserService
             return success;
         }
 
-        // Only pending/approved accounts get a link — an unverified account has its own resend
-        // flow, and a rejected or disabled one must not be handed a fresh credential.
+        // Only pending/approved get a link — unverified has its own resend flow; rejected and
+        // disabled must not get a fresh credential.
         if (user.Status is not (UserStatus.Pending or UserStatus.Approved))
         {
             _logger.LogInformation(
@@ -376,8 +373,7 @@ public class UserService : IUserService
             .Include(t => t.User)
             .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken);
 
-        // Distinct codes are safe here, same as verify-email: reaching any of them already
-        // requires holding a token, so none reveals whether an address has an account.
+        // Distinct codes are safe: reaching any of them already requires holding a token.
         if (token is null)
         {
             _logger.LogInformation("Password link rejected: no token matches the presented value.");
@@ -440,8 +436,7 @@ public class UserService : IUserService
             return ServiceResult<AuthResponse>.Validation("Email and password are required.");
         }
 
-        // Checked before the password so a blocked caller costs an index lookup rather than an
-        // Argon2 hash — otherwise the throttle is itself the cheapest way to burn the CPU.
+        // Before the password check: a blocked caller shouldn't cost an Argon2 hash.
         if (await _rateLimiter.IsBlockedAsync(email, ipAddress, AuthAttemptAction.Login, cancellationToken))
         {
             return ServiceResult<AuthResponse>.Unauthorized(
@@ -453,16 +448,14 @@ public class UserService : IUserService
 
         if (user is null)
         {
-            // Same work, same answer as a wrong password: the response must not reveal whether
-            // the account exists.
+            // Same work, same answer as a wrong password — no account enumeration.
             PasswordHasher.BurnVerifyTime(password);
             await _rateLimiter.RecordAttemptAsync(email, ipAddress, AuthAttemptAction.Login, cancellationToken);
 
             return InvalidCredentials();
         }
 
-        // Google-only accounts and an un-redeemed super admin have no hash — never hand null to
-        // the hasher. Same burn-and-fail treatment as a wrong password.
+        // No hash (Google-only, or un-redeemed super admin) — burn and fail like a wrong password.
         if (string.IsNullOrEmpty(user.PasswordHash))
         {
             PasswordHasher.BurnVerifyTime(password);
@@ -478,8 +471,8 @@ public class UserService : IUserService
             return InvalidCredentials();
         }
 
-        // Checked after the password so an anonymous caller cannot probe account state.
-        // A non-approved user is rejected here at token issue rather than handed a scopeless token.
+        // After the password check, so an anonymous caller cannot probe account state.
+        // Non-approved is rejected at token issue, never handed a scopeless token.
         if (user.Status != UserStatus.Approved)
         {
             return NotApproved(user);
@@ -487,8 +480,7 @@ public class UserService : IUserService
 
         user.LastLoginAt = DateTimeOffset.UtcNow;
 
-        // A successful sign-in clears the slate, so earlier fumbled attempts do not count
-        // towards a later lockout.
+        // A successful sign-in clears earlier failed attempts, so they can't cause a later lockout.
         await _rateLimiter.ClearAsync(email, AuthAttemptAction.Login, cancellationToken);
 
         var (response, _) = await IssueTokensAsync(user, cancellationToken);
@@ -513,17 +505,15 @@ public class UserService : IUserService
 
         var identity = validated.Value!;
 
-        // An unverified address is not proof of anything — matching on it would let anyone who
-        // can create a Google account with someone else's email claim their CMS user.
+        // Never match on an unverified address — anyone could claim another user's CMS account.
         if (!identity.EmailVerified)
         {
             return ServiceResult<AuthResponse>.Unauthorized(
                 "google_email_unverified", "This Google account's email address is not verified.");
         }
 
-        // Match on the subject first: it is stable, whereas an address can be reassigned.
-        // IgnoreQueryFilters so a soft-deleted account is found and refused rather than silently
-        // re-created as a brand new pending user.
+        // Subject first: it's stable, an address can be reassigned. IgnoreQueryFilters so a
+        // soft-deleted account is refused, not silently re-created as a new pending user.
         var user = await _db.Users
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(
@@ -557,8 +547,7 @@ public class UserService : IUserService
                 "account_disabled", "This account has been disabled. Contact the super admin.");
         }
 
-        // First Google sign-in for an account that registered with a password: link the two.
-        // The password still works — this adds a way in, it does not replace one.
+        // First Google sign-in on a password account: link them. The password still works.
         user.GoogleSubjectId ??= identity.Subject;
         user.AvatarUrl = identity.AvatarUrl ?? user.AvatarUrl;
 
@@ -587,8 +576,8 @@ public class UserService : IUserService
 
         var hash = RefreshTokenGenerator.Hash(presented);
 
-        // IgnoreQueryFilters so a soft-deleted owner still loads — the User navigation would
-        // otherwise come back null and the account checks below would never run.
+        // IgnoreQueryFilters so a soft-deleted owner still loads — otherwise User is null and
+        // the account checks below never run.
         var stored = await _db.RefreshTokens
             .IgnoreQueryFilters()
             .Include(t => t.User)
@@ -601,9 +590,8 @@ public class UserService : IUserService
 
         if (stored.RevokedAt is not null)
         {
-            // A revoked token coming back means it was replayed — most likely stolen, since the
-            // legitimate client would be holding its replacement. Kill the whole family rather
-            // than just this one.
+            // A replayed revoked token means theft — the real client holds its replacement.
+            // Kill the whole family, not just this one.
             await RevokeAllForUserAsync(stored.UserId, cancellationToken);
 
             return ServiceResult<AuthResponse>.Unauthorized(
@@ -617,8 +605,7 @@ public class UserService : IUserService
                 "refresh_token_expired", "This refresh token has expired. Sign in again.");
         }
 
-        // The check that bounds a revoked user's access: they cannot renew, whatever their old
-        // access token still says.
+        // What bounds a revoked user's access: they cannot renew, whatever their JWT still says.
         if (stored.User.Status != UserStatus.Approved || stored.User.IsDeleted)
         {
             await RevokeAllForUserAsync(stored.UserId, cancellationToken);

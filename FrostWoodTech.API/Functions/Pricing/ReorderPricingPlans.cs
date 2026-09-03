@@ -25,7 +25,7 @@ public class ReorderPricingPlans
         [HttpTrigger(
             AuthorizationLevel.Anonymous,
             "post",
-            Route = "admin/pricing-plans/reorder")] HttpRequest req,
+            Route = "cms/admin/pricing-plans/reorder")] HttpRequest req,
         CancellationToken cancellationToken)
     {
         HttpResponses.MarkNoStore(req);

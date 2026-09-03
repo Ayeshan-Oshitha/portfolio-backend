@@ -22,7 +22,7 @@ public class SetPassword
     /// <summary>Anonymous by design — the emailed token is the authentication here, not a JWT.</summary>
     [Function("SetPassword")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/auth/set-password")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "cms/admin/auth/set-password")] HttpRequest req,
         CancellationToken cancellationToken)
     {
         HttpResponses.MarkNoStore(req);

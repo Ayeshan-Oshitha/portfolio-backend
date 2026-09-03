@@ -10,28 +10,28 @@ paths:
 
 # Auth
 
-Both public sites are fully anonymous. Only `/api/admin/*` (the CMS) is protected.
+Both public sites are fully anonymous. Only `/api/cms/admin/*` (the CMS) is protected.
 
 ## Registration and email verification
 
-`POST /admin/auth/register` creates a `email_verification_required` account and emails a
+`POST /cms/admin/auth/register` creates a `email_verification_required` account and emails a
 verification link (`{Email:BaseUrl}/verify-email?token=...`, 24h expiry, single-use, hashed in
 the DB exactly like a refresh token — see `EmailVerificationToken`/`EmailVerificationTokenGenerator`).
 No token is issued at registration.
 
-`POST /admin/auth/verify-email` consumes the token and moves the account to `pending`. Errors:
+`POST /cms/admin/auth/verify-email` consumes the token and moves the account to `pending`. Errors:
 `invalid_verification_token` (unknown token), `verification_token_already_used`,
 `verification_token_expired` — none of these leak whether an email is registered, since the token
 itself already proves inbox possession.
 
-`POST /admin/auth/resend-verification` issues a fresh token, invalidating any prior unused one.
+`POST /cms/admin/auth/resend-verification` issues a fresh token, invalidating any prior unused one.
 It **always returns the same generic response** regardless of whether the email exists, is
 already verified, or is rate-limited (3 sends/hour/email) — this endpoint must never be usable to
 enumerate accounts.
 
 ## Forgotten passwords
 
-`POST /admin/auth/forgot-password` issues a 1h reset link and emails it. **Always the same
+`POST /cms/admin/auth/forgot-password` issues a 1h reset link and emails it. **Always the same
 generic 200** — unknown, unverified, rejected, disabled, rate limited or provider-down all look
 identical, since the service never returns a failure here. Only `pending` and `approved`
 accounts get a link; issuing one invalidates any outstanding unused reset link for that user.
@@ -40,7 +40,7 @@ broken one, same as the seeded super admin below.
 
 ## Setting a first password
 
-`POST /admin/auth/set-password` redeems a single-use link (`{Email:BaseUrl}/set-password?token=...`,
+`POST /cms/admin/auth/set-password` redeems a single-use link (`{Email:BaseUrl}/set-password?token=...`,
 hashed in `password_tokens` like a verification token). Setup and reset links are the same row,
 told apart by `purpose`, and redeemed identically. Sets `password_hash`, invalidates every other
 outstanding link for the user regardless of purpose, revokes all refresh tokens, issues no token
@@ -65,7 +65,7 @@ auto-approve.
 
 ## Tokens
 
-Claims: `sub`, `email`, `role`, `jti`. Validate on every `/api/admin/*` call in a **Functions
+Claims: `sub`, `email`, `role`, `jti`. Validate on every `/api/cms/admin/*` call in a **Functions
 middleware**, not per-function.
 
 Refresh tokens **rotate**: each refresh revokes the presented token and issues a new one. A

@@ -35,8 +35,7 @@ public class ProjectService : IProjectService
         int pageSize,
         CancellationToken cancellationToken)
     {
-        // is_deleted is handled by the DbContext's global filter; is_published and the site flag
-        // are applied here and are not optional.
+        // is_deleted comes from the global query filter; is_published and the site flag are not optional.
         var query = ForSite(_db.Projects.AsNoTracking().Where(p => p.IsPublished), site);
 
         if (tagSlug is not null)
@@ -207,8 +206,7 @@ public class ProjectService : IProjectService
         _db.Projects.Add(project);
         await _db.SaveChangesAsync(cancellationToken);
 
-        // Re-read rather than project the in-memory entity: the links were added by tag id, so
-        // their Tag navigations are not loaded yet.
+        // Re-read: links were added by tag id, so their Tag navigations are not loaded yet.
         return await GetByIdAsync(project.Id, cancellationToken);
     }
 
@@ -381,8 +379,7 @@ public class ProjectService : IProjectService
             return ServiceResult<ProjectImageResponse>.Validation(validationError);
         }
 
-        // The first image is the primary whatever the caller asked for — a project with images
-        // always has exactly one.
+        // First image is always primary, whatever the caller asked — a project has exactly one.
         var isPrimary = request.IsPrimary || project.Images.Count == 0;
 
         var image = new ProjectImage
@@ -436,8 +433,7 @@ public class ProjectService : IProjectService
             return ServiceResult<ProjectImageResponse>.Validation(validationError);
         }
 
-        // Clearing the flag on the only image would leave the project without a primary, so it
-        // stays put.
+        // Clearing it on the only image would leave no primary, so it stays put.
         var isPrimary = request.IsPrimary || project.Images.Count == 1;
 
         image.ObjectKey = objectKey!;
@@ -476,13 +472,12 @@ public class ProjectService : IProjectService
                 $"No image with id {imageId} on project {projectId}.");
         }
 
-        // Hard delete — the row carries no soft-delete flag, so the Neon Object Storage asset goes too
-        // (below, once the row is actually gone).
+        // Hard delete — no soft-delete flag, so the storage asset goes too (below, once the row is gone).
         project.Images.Remove(image);
         _db.ProjectImages.Remove(image);
 
-        // Losing the primary promotes the next image so the project still has exactly one. The
-        // delete has to land before the promotion, or the partial unique index sees two primaries.
+        // Promote the next image so exactly one primary remains. Delete must land first, or the
+        // partial unique index sees two primaries.
         var successor = image.IsPrimary
             ? project.Images.OrderBy(i => i.SortOrder).FirstOrDefault()
             : null;
@@ -499,9 +494,8 @@ public class ProjectService : IProjectService
                 cancellationToken);
         }
 
-        // After the row is committed, never before: a destroy that succeeded against a delete
-        // that then rolled back would leave a row pointing at nothing. The reverse — a failed
-        // destroy — only leaves an orphan asset, so it must not fail the request.
+        // After the commit, never before: a destroy against a rolled-back delete leaves a row
+        // pointing at nothing. The reverse only orphans an asset, so it must not fail the request.
         await _mediaService.DeleteFileAsync(image.ObjectKey, cancellationToken);
 
         return ServiceResult<bool>.Success(true);

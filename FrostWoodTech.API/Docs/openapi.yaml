@@ -10,7 +10,7 @@ info:
     ## Surfaces
 
     * `/public/*` — anonymous, read-only, cacheable. Published + non-deleted rows only.
-    * `/admin/*` — JWT required, full CRUD, includes drafts and metadata.
+    * `/cms/admin/*` — JWT required, full CRUD, includes drafts and metadata.
 
     ## Conventions
 
@@ -361,7 +361,7 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
 
   # ------------------------------------------------------------------------------- auth
-  /admin/auth/register:
+  /cms/admin/auth/register:
     post:
       tags: [auth]
       operationId: register
@@ -382,7 +382,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "409": { $ref: "#/components/responses/Conflict" }
 
-  /admin/auth/verify-email:
+  /cms/admin/auth/verify-email:
     post:
       tags: [auth]
       operationId: verifyEmail
@@ -412,7 +412,7 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
 
-  /admin/auth/forgot-password:
+  /cms/admin/auth/forgot-password:
     post:
       tags: [auth]
       operationId: forgotPassword
@@ -432,7 +432,7 @@ paths:
               schema: { $ref: "#/components/schemas/ForgotPasswordResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
 
-  /admin/auth/set-password:
+  /cms/admin/auth/set-password:
     post:
       tags: [auth]
       operationId: setPassword
@@ -462,7 +462,7 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
 
-  /admin/auth/resend-verification:
+  /cms/admin/auth/resend-verification:
     post:
       tags: [auth]
       operationId: resendVerification
@@ -482,7 +482,7 @@ paths:
               schema: { $ref: "#/components/schemas/ResendVerificationResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
 
-  /admin/auth/login:
+  /cms/admin/auth/login:
     post:
       tags: [auth]
       operationId: login
@@ -502,7 +502,7 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
 
-  /admin/auth/google:
+  /cms/admin/auth/google:
     post:
       tags: [auth]
       operationId: googleSignIn
@@ -518,7 +518,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/auth/refresh:
+  /cms/admin/auth/refresh:
     post:
       tags: [auth]
       operationId: refresh
@@ -535,7 +535,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/auth/logout:
+  /cms/admin/auth/logout:
     post:
       tags: [auth]
       operationId: logout
@@ -550,7 +550,7 @@ paths:
         "204": { $ref: "#/components/responses/NoContent" }
         "400": { $ref: "#/components/responses/BadRequest" }
 
-  /admin/auth/me:
+  /cms/admin/auth/me:
     get:
       tags: [auth]
       operationId: getMe
@@ -563,7 +563,7 @@ paths:
               schema: { $ref: "#/components/schemas/AdminUserResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/auth/change-password:
+  /cms/admin/auth/change-password:
     post:
       tags: [auth]
       operationId: changePassword
@@ -580,7 +580,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   # ------------------------------------------------------------------------------ users
-  /admin/users:
+  /cms/admin/users:
     get:
       tags: [admin]
       operationId: getUsers
@@ -609,7 +609,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /admin/users/{id}:
+  /cms/admin/users/{id}:
     delete:
       tags: [admin]
       operationId: deleteUser
@@ -622,7 +622,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/users/{id}/approve:
+  /cms/admin/users/{id}/approve:
     post:
       tags: [admin]
       operationId: approveUser
@@ -635,7 +635,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/users/{id}/reject:
+  /cms/admin/users/{id}/reject:
     post:
       tags: [admin]
       operationId: rejectUser
@@ -654,7 +654,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/users/{id}/disable:
+  /cms/admin/users/{id}/disable:
     post:
       tags: [admin]
       operationId: disableUser
@@ -668,7 +668,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # --------------------------------------------------------------------------- projects
-  /admin/projects:
+  /cms/admin/projects:
     get:
       tags: [admin]
       operationId: getAdminProjects
@@ -713,7 +713,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
 
-  /admin/projects/{id}:
+  /cms/admin/projects/{id}:
     get:
       tags: [admin]
       operationId: getAdminProjectById
@@ -751,7 +751,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/projects/{id}/publish:
+  /cms/admin/projects/{id}/publish:
     post:
       tags: [admin]
       operationId: setProjectPublished
@@ -769,7 +769,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/projects/reorder:
+  /cms/admin/projects/reorder:
     post:
       tags: [admin]
       operationId: reorderProjects
@@ -784,7 +784,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/projects/{id}/images:
+  /cms/admin/projects/{id}/images:
     post:
       tags: [admin]
       operationId: addProjectImage
@@ -806,7 +806,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/projects/{id}/images/{imageId}:
+  /cms/admin/projects/{id}/images/{imageId}:
     put:
       tags: [admin]
       operationId: updateProjectImage
@@ -841,7 +841,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/projects/{id}/images/reorder:
+  /cms/admin/projects/{id}/images/reorder:
     post:
       tags: [admin]
       operationId: reorderProjectImages
@@ -859,7 +859,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # --------------------------------------------------------------------------- articles
-  /admin/articles:
+  /cms/admin/articles:
     get:
       tags: [admin]
       operationId: getAdminArticles
@@ -904,7 +904,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
 
-  /admin/articles/{id}:
+  /cms/admin/articles/{id}:
     get:
       tags: [admin]
       operationId: getAdminArticleById
@@ -940,7 +940,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/articles/{id}/publish:
+  /cms/admin/articles/{id}/publish:
     post:
       tags: [admin]
       operationId: setArticlePublished
@@ -957,7 +957,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/articles/reorder:
+  /cms/admin/articles/reorder:
     post:
       tags: [admin]
       operationId: reorderArticles
@@ -973,7 +973,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   # --------------------------------------------------------------------------- services
-  /admin/services:
+  /cms/admin/services:
     get:
       tags: [admin]
       operationId: getAdminServices
@@ -1018,7 +1018,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
 
-  /admin/services/{id}:
+  /cms/admin/services/{id}:
     get:
       tags: [admin]
       operationId: getAdminServiceById
@@ -1054,7 +1054,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/services/{id}/publish:
+  /cms/admin/services/{id}/publish:
     post:
       tags: [admin]
       operationId: setServicePublished
@@ -1071,7 +1071,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/services/reorder:
+  /cms/admin/services/reorder:
     post:
       tags: [admin]
       operationId: reorderServices
@@ -1086,7 +1086,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/services/{id}/features:
+  /cms/admin/services/{id}/features:
     post:
       tags: [admin]
       operationId: addServiceFeature
@@ -1107,7 +1107,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/services/{id}/features/{featureId}:
+  /cms/admin/services/{id}/features/{featureId}:
     put:
       tags: [admin]
       operationId: updateServiceFeature
@@ -1141,7 +1141,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/services/{id}/features/reorder:
+  /cms/admin/services/{id}/features/reorder:
     post:
       tags: [admin]
       operationId: reorderServiceFeatures
@@ -1159,7 +1159,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ---------------------------------------------------------------------- pricing plans
-  /admin/pricing-plans:
+  /cms/admin/pricing-plans:
     get:
       tags: [admin]
       operationId: getAdminPricingPlans
@@ -1213,7 +1213,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/pricing-plans/{id}:
+  /cms/admin/pricing-plans/{id}:
     get:
       tags: [admin]
       operationId: getAdminPricingPlanById
@@ -1248,7 +1248,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/pricing-plans/{id}/publish:
+  /cms/admin/pricing-plans/{id}/publish:
     post:
       tags: [admin]
       operationId: setPricingPlanPublished
@@ -1265,7 +1265,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/pricing-plans/reorder:
+  /cms/admin/pricing-plans/reorder:
     post:
       tags: [admin]
       operationId: reorderPricingPlans
@@ -1280,7 +1280,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/pricing-plans/{id}/features:
+  /cms/admin/pricing-plans/{id}/features:
     post:
       tags: [admin]
       operationId: addPricingPlanFeature
@@ -1301,7 +1301,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/pricing-plans/{id}/features/{featureId}:
+  /cms/admin/pricing-plans/{id}/features/{featureId}:
     put:
       tags: [admin]
       operationId: updatePricingPlanFeature
@@ -1335,7 +1335,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/pricing-plans/{id}/features/reorder:
+  /cms/admin/pricing-plans/{id}/features/reorder:
     post:
       tags: [admin]
       operationId: reorderPricingPlanFeatures
@@ -1353,7 +1353,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ------------------------------------------------------------------------------- faqs
-  /admin/faqs:
+  /cms/admin/faqs:
     get:
       tags: [admin]
       operationId: getAdminFaqs
@@ -1400,7 +1400,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/faqs/{id}:
+  /cms/admin/faqs/{id}:
     get:
       tags: [admin]
       operationId: getAdminFaqById
@@ -1435,7 +1435,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/faqs/reorder:
+  /cms/admin/faqs/reorder:
     post:
       tags: [admin]
       operationId: reorderFaqs
@@ -1451,7 +1451,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   # ------------------------------------------------------------------------------- reviews
-  /admin/reviews:
+  /cms/admin/reviews:
     get:
       tags: [admin]
       operationId: getAdminReviews
@@ -1501,7 +1501,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/reviews/{id}:
+  /cms/admin/reviews/{id}:
     get:
       tags: [admin]
       operationId: getAdminReviewById
@@ -1537,7 +1537,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/reviews/reorder:
+  /cms/admin/reviews/reorder:
     post:
       tags: [admin]
       operationId: reorderReviews
@@ -1554,7 +1554,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   # ------------------------------------------------------------------------------- tags
-  /admin/tags:
+  /cms/admin/tags:
     get:
       tags: [admin]
       operationId: getAdminTags
@@ -1600,7 +1600,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
 
-  /admin/tags/{id}:
+  /cms/admin/tags/{id}:
     get:
       tags: [admin]
       operationId: getAdminTagById
@@ -1639,7 +1639,7 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
 
   # ------------------------------------------------------------------------------ media
-  /admin/media/presigned-upload:
+  /cms/admin/media/presigned-upload:
     post:
       tags: [admin]
       operationId: createPresignedUpload
@@ -1669,7 +1669,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: "The `accessToken` from login/google/refresh, sent as `Authorization: Bearer <token>`. Required on all `/admin/*` routes except register, login, google, refresh and logout."
+      description: "The `accessToken` from login/google/refresh, sent as `Authorization: Bearer <token>`. Required on all `/cms/admin/*` routes except register, login, google, refresh and logout."
 
   headers:
     ETag:
@@ -2529,7 +2529,7 @@ components:
               description: >
                 Raw Markdown. Embed media with a media://articles/... reference (e.g.
                 media://articles/images/example.png) instead of a real URL — insert the
-                reference after uploading via POST /admin/media/presigned-upload.
+                reference after uploading via POST /cms/admin/media/presigned-upload.
             isPublished: { type: boolean, default: false }
             tagIds:
               type: array

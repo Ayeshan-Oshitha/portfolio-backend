@@ -66,8 +66,7 @@ public class FrostWoodTechDbContext : DbContext
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(FrostWoodTechDbContext).Assembly);
 
-        // The audit and site visibility blocks are identical everywhere, so they are mapped
-        // once here rather than repeated in every IEntityTypeConfiguration.
+        // Mapped once here rather than repeated in every IEntityTypeConfiguration.
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             var clrType = entityType.ClrType;
@@ -80,9 +79,8 @@ public class FrostWoodTechDbContext : DbContext
                 entity.Property(nameof(AuditableEntity.UpdatedAt)).HasColumnName("updated_at");
                 entity.Property(nameof(AuditableEntity.IsDeleted)).HasColumnName("is_deleted").HasDefaultValue(false);
 
-                // Soft delete must not be forgettable on a read path. Bypass only with
-                // IgnoreQueryFilters, and only where a soft-deleted row must still be found on
-                // purpose (e.g. rejecting a login for a deleted account) — see UserService.
+                // Soft delete must not be forgettable on a read path. Bypass with IgnoreQueryFilters
+                // only where a deleted row must still be found on purpose — see UserService.
                 entity.HasQueryFilter(BuildNotDeletedFilter(clrType));
             }
 

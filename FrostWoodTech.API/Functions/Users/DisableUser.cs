@@ -19,7 +19,7 @@ public class DisableUser
     /// <summary>Super admin only. Revokes access without deleting the account or its audit trail.</summary>
     [Function("DisableUser")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/users/{id:guid}/disable")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "cms/admin/users/{id:guid}/disable")] HttpRequest req,
         Guid id,
         CancellationToken cancellationToken)
     {

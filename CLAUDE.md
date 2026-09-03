@@ -32,7 +32,7 @@ propose adding repositories, CQRS, or a mediator.
 
 - **`/api/public/*`** — anonymous, read-only, cache-friendly. Returns only published,
   non-deleted rows.
-- **`/api/admin/*`** — JWT required, full CRUD, returns drafts and metadata.
+- **`/api/cms/admin/*`** — JWT required, full CRUD, returns drafts and metadata.
 
 Separate folders, separate response DTOs. A public DTO must never carry admin fields
 (internal notes, audit info, unpublished relations).

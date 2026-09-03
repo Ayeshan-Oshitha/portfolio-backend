@@ -19,13 +19,10 @@ public class AddProjectImage
         _projectService = projectService;
     }
 
-    /// <summary>
-    /// Records what Neon Object Storage handed back after a direct upload — the bytes never pass through
-    /// the API.
-    /// </summary>
+    /// <summary>Records what Neon Object Storage handed back after a direct upload — bytes never pass through the API.</summary>
     [Function("AddProjectImage")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/projects/{id:guid}/images")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "cms/admin/projects/{id:guid}/images")] HttpRequest req,
         Guid id,
         CancellationToken cancellationToken)
     {

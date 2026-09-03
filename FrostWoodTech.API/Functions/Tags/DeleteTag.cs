@@ -22,7 +22,7 @@ public class DeleteTag
     /// </summary>
     [Function("DeleteTag")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "admin/tags/{id:guid}")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "cms/admin/tags/{id:guid}")] HttpRequest req,
         Guid id,
         CancellationToken cancellationToken)
     {

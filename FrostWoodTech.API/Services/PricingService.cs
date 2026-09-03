@@ -70,8 +70,7 @@ public class PricingService : IPricingService
             query = ForSite(query, site.Value);
         }
 
-        // The admin list defaults to everything; these two narrow it the same way the public
-        // routes do, but as explicit filters rather than an absent parameter.
+        // Admin defaults to everything; these narrow it as explicit filters, not an absent parameter.
         if (comboOnly)
         {
             query = query.Where(p => p.ServiceId == null);
@@ -171,8 +170,7 @@ public class PricingService : IPricingService
         _db.PricingPlans.Add(plan);
         await _db.SaveChangesAsync(cancellationToken);
 
-        // Re-read so the response carries the feature list the projection builds — empty here,
-        // but the shape stays the same as every other admin read.
+        // Re-read so the response shape matches every other admin read (feature list empty here).
         return await GetByIdAsync(plan.Id, cancellationToken);
     }
 
@@ -519,15 +517,13 @@ public class PricingService : IPricingService
             return "Currency is required.";
         }
 
-        // The column is char(3), so a longer value would surface as a database error rather than
-        // a readable one.
+        // char(3) column — a longer value would surface as a database error, not a readable one.
         if (currency.Length != 3 || !currency.All(char.IsAsciiLetter))
         {
             return "Currency must be a 3-letter ISO 4217 code, e.g. 'LKR'.";
         }
 
-        // Null is meaningful here — it means "Custom / Contact us" — so only a supplied amount is
-        // checked.
+        // Null is meaningful here ("Custom / Contact us"), so only a supplied amount is checked.
         if (request.PriceAmount < 0)
         {
             return "priceAmount cannot be negative.";

@@ -4,13 +4,9 @@ using System.Text;
 namespace FrostWoodTech.API.Auth;
 
 /// <summary>
-/// Raw refresh tokens and the hash stored against them.
-/// <para>
-/// SHA-256 here rather than the Argon2id in <see cref="PasswordHasher"/>, and that difference is
-/// deliberate. A refresh token is looked up <em>by</em> its hash, so the hash has to be
-/// deterministic and unsalted; and unlike a password this is 256 bits of entropy from a CSPRNG,
-/// so there is no dictionary to slow an attacker down against.
-/// </para>
+/// SHA-256, not the Argon2id in <see cref="PasswordHasher"/>: the token is looked up
+/// <em>by</em> its hash, so it must be deterministic, and it's already 256 bits of CSPRNG
+/// entropy with no dictionary to slow down.
 /// </summary>
 public static class RefreshTokenGenerator
 {

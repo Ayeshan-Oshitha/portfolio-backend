@@ -12,32 +12,32 @@ using FrostWoodTech.API.Interfaces;
 namespace FrostWoodTech.API.Middleware;
 
 /// <summary>
-/// Authorisation for <c>/api/admin/*</c> lives here rather than per function, so a new admin
+/// Authorisation for <c>/api/cms/admin/*</c> lives here rather than per function, so a new admin
 /// endpoint is protected the moment it is added. Function keys are not an auth system — every
 /// trigger stays <c>AuthorizationLevel.Anonymous</c>.
 /// </summary>
 public sealed class JwtAuthenticationMiddleware : IFunctionsWorkerMiddleware
 {
-    private const string AdminPrefix = "/admin/";
+    private const string AdminPrefix = "/cms/admin/";
 
     /// <summary>
     /// An explicit allow-list, not a deny-list: forgetting to add a route here fails closed.
     /// </summary>
     private static readonly string[] AnonymousAdminPaths =
     [
-        "/admin/auth/register",
-        "/admin/auth/login",
+        "/cms/admin/auth/register",
+        "/cms/admin/auth/login",
         // Exchanging a Google token is how a caller gets its first access token.
-        "/admin/auth/google",
+        "/cms/admin/auth/google",
         // Both must work with a dead access token — that is the whole point of them.
-        "/admin/auth/refresh",
-        "/admin/auth/logout",
+        "/cms/admin/auth/refresh",
+        "/cms/admin/auth/logout",
         // A caller has no token yet at either step of the verification flow.
-        "/admin/auth/verify-email",
-        "/admin/auth/resend-verification",
+        "/cms/admin/auth/verify-email",
+        "/cms/admin/auth/resend-verification",
         // Neither has a token yet either, by definition.
-        "/admin/auth/forgot-password",
-        "/admin/auth/set-password"
+        "/cms/admin/auth/forgot-password",
+        "/cms/admin/auth/set-password"
     ];
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)

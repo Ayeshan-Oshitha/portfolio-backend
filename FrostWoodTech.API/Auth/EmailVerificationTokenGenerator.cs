@@ -4,10 +4,8 @@ using System.Text;
 namespace FrostWoodTech.API.Auth;
 
 /// <summary>
-/// Raw verification tokens and the hash stored against them. Same shape as
-/// <see cref="RefreshTokenGenerator"/> and for the same reason: the token is looked up by its
-/// hash, so the hash must be deterministic, and it is already 256 bits of CSPRNG entropy so no
-/// slow password-style hash is needed.
+/// Same shape as <see cref="RefreshTokenGenerator"/>: looked up by hash, so the hash must be
+/// deterministic, and it's already 256 bits of CSPRNG entropy — no slow hash needed.
 /// </summary>
 public static class EmailVerificationTokenGenerator
 {

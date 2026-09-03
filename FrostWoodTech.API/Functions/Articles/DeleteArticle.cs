@@ -19,7 +19,7 @@ public class DeleteArticle
     /// <summary>Soft delete — hard delete stays a super-admin-only concern.</summary>
     [Function("DeleteArticle")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "admin/articles/{id:guid}")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "cms/admin/articles/{id:guid}")] HttpRequest req,
         Guid id,
         CancellationToken cancellationToken)
     {

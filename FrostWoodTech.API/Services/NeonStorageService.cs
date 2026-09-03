@@ -35,8 +35,7 @@ public class NeonStorageService : IMediaService
     {
         if (!_options.IsConfigured)
         {
-            // A misconfigured deployment is a bad request the operator can act on, not a 500 the
-            // admin SPA can only shrug at.
+            // A misconfigured deployment is a bad request the operator can act on, not a 500.
             return ServiceResult<PresignedUploadResponse>.Validation(
                 "Neon Object Storage is not configured. Set NeonS3__Endpoint, NeonS3__AccessKey, " +
                 "NeonS3__SecretKey and NeonS3__BucketName.");
@@ -93,8 +92,7 @@ public class NeonStorageService : IMediaService
                 new DeleteObjectRequest { BucketName = _options.BucketName, Key = objectKey },
                 cancellationToken);
 
-            // S3's delete is idempotent — an object that is already gone still returns success,
-            // which is the outcome we wanted.
+            // S3 delete is idempotent — an already-gone object still returns success.
             return true;
         }
         catch (AmazonS3Exception ex)
@@ -118,8 +116,7 @@ public class NeonStorageService : IMediaService
             return ServiceResult<string>.Success($"{root}/{target.ToString().ToLowerInvariant()}/");
         }
 
-        // Re-slugging is what makes the path safe: SlugGenerator strips everything but [a-z0-9-],
-        // so no "../" can survive it.
+        // Re-slugging makes the path safe: SlugGenerator strips all but [a-z0-9-], so no "../" survives.
         var safeSlug = string.IsNullOrWhiteSpace(slug) ? string.Empty : SlugGenerator.Generate(slug);
         var folderName = target.ToString().ToLowerInvariant();
 

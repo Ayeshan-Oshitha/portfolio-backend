@@ -25,7 +25,7 @@ public class SetArticlePublished
     /// </summary>
     [Function("SetArticlePublished")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/articles/{id:guid}/publish")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "cms/admin/articles/{id:guid}/publish")] HttpRequest req,
         Guid id,
         CancellationToken cancellationToken)
     {

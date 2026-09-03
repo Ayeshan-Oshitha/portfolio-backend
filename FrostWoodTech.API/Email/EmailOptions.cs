@@ -27,8 +27,8 @@ public sealed class EmailOptions
     public string ApiKey { get; set; } = string.Empty;
 
     /// <summary>
-    /// Base URL of the admin SPA, so a future password-reset mail can build a link the recipient
-    /// can actually open. The API does not know its own front end otherwise.
+    /// Base URL of the admin SPA, used to build links (verification, password reset) the
+    /// recipient can actually open. The API does not know its own front end otherwise.
     /// </summary>
     public string BaseUrl { get; set; } = string.Empty;
 

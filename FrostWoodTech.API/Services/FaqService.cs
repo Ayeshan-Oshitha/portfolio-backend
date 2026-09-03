@@ -26,8 +26,7 @@ public class FaqService : IFaqService
         string? category,
         CancellationToken cancellationToken)
     {
-        // is_deleted is handled by the DbContext's global filter; is_published and the site flag
-        // are applied here and are not optional.
+        // is_deleted comes from the global query filter; is_published and the site flag are not optional.
         var query = ForSite(_db.Faqs.AsNoTracking().Where(f => f.IsPublished), site);
 
         if (category is not null)

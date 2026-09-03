@@ -12,10 +12,10 @@ Image bytes never touch the API. The client uploads straight to Neon Object Stor
 using a presigned PUT URL the API generates.
 
 ```
-Admin SPA → POST /api/admin/media/presigned-upload { target, slug?, objectKey? }
+Admin SPA → POST /api/cms/admin/media/presigned-upload { target, slug?, objectKey? }
           ← { uploadUrl, objectKey, expiresAt }
 Admin SPA → PUT direct to Neon Object Storage using uploadUrl
-Admin SPA → POST /api/admin/projects/{id}/images { objectKey, url, width, height, altText }
+Admin SPA → POST /api/cms/admin/projects/{id}/images { objectKey, url, width, height, altText }
 ```
 
 The presigned-upload endpoint requires a valid admin JWT — an open bucket policy would let

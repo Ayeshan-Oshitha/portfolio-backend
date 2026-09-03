@@ -24,7 +24,7 @@ public class AddServiceFeature
         [HttpTrigger(
             AuthorizationLevel.Anonymous,
             "post",
-            Route = "admin/services/{id:guid}/features")] HttpRequest req,
+            Route = "cms/admin/services/{id:guid}/features")] HttpRequest req,
         Guid id,
         CancellationToken cancellationToken)
     {
