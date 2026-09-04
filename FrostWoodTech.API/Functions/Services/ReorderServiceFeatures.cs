@@ -19,16 +19,13 @@ public class ReorderServiceFeatures
         _serviceCatalog = serviceCatalog;
     }
 
-    /// <summary>
-    /// Bulk sort_order update for one feature list. No site here — a service has a single feature
-    /// order.
-    /// </summary>
+    /// <summary>Bulk sort_order update for one feature list. No site here — a service has a single feature order.</summary>
     [Function("ReorderServiceFeatures")]
     public async Task<IActionResult> Run(
         [HttpTrigger(
             AuthorizationLevel.Anonymous,
             "post",
-            Route = "admin/services/{id:guid}/features/reorder")] HttpRequest req,
+            Route = "cms/admin/services/{id:guid}/features/reorder")] HttpRequest req,
         Guid id,
         CancellationToken cancellationToken)
     {

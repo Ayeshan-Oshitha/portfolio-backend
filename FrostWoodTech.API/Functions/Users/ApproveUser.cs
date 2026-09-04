@@ -19,7 +19,7 @@ public class ApproveUser
     /// <summary>Super admin only. Lets a pending or rejected account sign in.</summary>
     [Function("ApproveUser")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/users/{id:guid}/approve")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "cms/admin/users/{id:guid}/approve")] HttpRequest req,
         Guid id,
         CancellationToken cancellationToken)
     {

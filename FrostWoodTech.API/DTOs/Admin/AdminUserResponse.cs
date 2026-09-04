@@ -21,6 +21,8 @@ public sealed class AdminUserResponse
 
     public DateTimeOffset? ApprovedAt { get; init; }
 
+    public DateTimeOffset? EmailVerifiedAt { get; init; }
+
     /// <summary>Set only on a rejected account, so the admin SPA can show why.</summary>
     public string? RejectionReason { get; init; }
 

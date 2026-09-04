@@ -17,9 +17,8 @@ public class GetOpenApiSpec
     }
 
     /// <summary>
-    /// The machine-readable contract the three frontends generate clients from. Anonymous, but
-    /// gated on <c>Docs__Enabled</c> — and a disabled deployment answers <c>404</c> rather than
-    /// <c>403</c>, so it does not confirm the endpoint is there at all.
+    /// Anonymous, gated on <c>Docs__Enabled</c>; a disabled deployment answers <c>404</c> rather
+    /// than <c>403</c> so it doesn't confirm the endpoint exists.
     /// </summary>
     [Function("GetOpenApiSpec")]
     public IActionResult Run(
@@ -32,8 +31,7 @@ public class GetOpenApiSpec
             return new NotFoundResult();
         }
 
-        // A developer-facing artefact, not a cached public read — it stays off the ETag path so
-        // an edited spec shows up on the next request.
+        // No-store, not cached: an edited spec should show up on the next request.
         req.HttpContext.Response.Headers.CacheControl = "no-store";
 
         return new ContentResult

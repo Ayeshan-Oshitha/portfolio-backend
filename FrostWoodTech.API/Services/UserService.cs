@@ -1,12 +1,14 @@
 using System.Linq.Expressions;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using FrostWoodTech.API.Auth;
 using FrostWoodTech.API.Common;
 using FrostWoodTech.API.Data;
 using FrostWoodTech.API.DTOs.Admin;
+using FrostWoodTech.API.Email;
 using FrostWoodTech.API.Entities;
 using FrostWoodTech.API.Enums;
 using FrostWoodTech.API.Interfaces;
@@ -18,6 +20,15 @@ public class UserService : IUserService
     private const int MinimumPasswordLength = 8;
 
     private const string SuperAdminOnly = "Only the super admin can manage users.";
+
+    private static readonly TimeSpan VerificationTokenLifetime = TimeSpan.FromHours(24);
+
+    /// <summary>Shorter than the 24h bootstrap link — a reset is used within minutes.</summary>
+    private static readonly TimeSpan ResetTokenLifetime = TimeSpan.FromHours(1);
+
+    private static readonly TimeSpan ResendWindow = TimeSpan.FromHours(1);
+
+    private const int MaxResendsPerEmailPerWindow = 3;
 
     private static readonly Expression<Func<User, AdminUserResponse>> AdminProjection = user =>
         new AdminUserResponse
@@ -31,6 +42,7 @@ public class UserService : IUserService
             LastLoginAt = user.LastLoginAt,
             ApprovedAt = user.ApprovedAt,
             RejectionReason = user.RejectionReason,
+            EmailVerifiedAt = user.EmailVerifiedAt,
             CreatedAt = user.CreatedAt
         };
 
@@ -42,6 +54,9 @@ public class UserService : IUserService
     private readonly ILoginRateLimiter _rateLimiter;
     private readonly CurrentUser _currentUser;
     private readonly JwtOptions _jwtOptions;
+    private readonly IEmailService _email;
+    private readonly EmailOptions _emailOptions;
+    private readonly ILogger<UserService> _logger;
 
     public UserService(
         FrostWoodTechDbContext db,
@@ -49,7 +64,10 @@ public class UserService : IUserService
         IGoogleTokenValidator google,
         ILoginRateLimiter rateLimiter,
         CurrentUser currentUser,
-        IOptions<JwtOptions> jwtOptions)
+        IOptions<JwtOptions> jwtOptions,
+        IEmailService email,
+        IOptions<EmailOptions> emailOptions,
+        ILogger<UserService> logger)
     {
         _db = db;
         _tokens = tokens;
@@ -57,6 +75,9 @@ public class UserService : IUserService
         _rateLimiter = rateLimiter;
         _currentUser = currentUser;
         _jwtOptions = jwtOptions.Value;
+        _email = email;
+        _emailOptions = emailOptions.Value;
+        _logger = logger;
     }
 
     public async Task<ServiceResult<AdminUserResponse>> RegisterAsync(
@@ -90,13 +111,314 @@ public class UserService : IUserService
             FirstName = firstName!,
             LastName = lastName!,
             PasswordHash = PasswordHasher.Hash(request.Password!),
-            // Registration is open but powerless: no token until the super admin approves.
+            // Open but powerless: no token until verified and approved.
             Role = UserRole.Admin,
-            Status = UserStatus.Pending
+            Status = UserStatus.EmailVerificationRequired
         };
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync(cancellationToken);
+
+        await IssueVerificationEmailAsync(user, cancellationToken);
+
+        return ServiceResult<AdminUserResponse>.Success(ToResponse(user));
+    }
+
+    public async Task<ServiceResult<AdminUserResponse>> VerifyEmailAsync(
+        VerifyEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (Blank(request.Token) is not { } rawToken)
+        {
+            return ServiceResult<AdminUserResponse>.Validation("A token is required.");
+        }
+
+        var hash = EmailVerificationTokenGenerator.Hash(rawToken);
+
+        var token = await _db.EmailVerificationTokens
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken);
+
+        if (token is null)
+        {
+            return ServiceResult<AdminUserResponse>.NotFound(
+                "invalid_verification_token", "This verification link is not valid.");
+        }
+
+        if (token.UsedAt is not null || token.User.Status != UserStatus.EmailVerificationRequired)
+        {
+            return ServiceResult<AdminUserResponse>.Conflict(
+                "verification_token_already_used",
+                "This link has already been used. If you haven't verified yet, request a new one.");
+        }
+
+        if (token.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return ServiceResult<AdminUserResponse>.Conflict(
+                "verification_token_expired",
+                "This link has expired. Request a new verification email.");
+        }
+
+        var user = token.User;
+
+        user.Status = UserStatus.Pending;
+        user.EmailVerifiedAt = DateTimeOffset.UtcNow;
+        token.UsedAt = DateTimeOffset.UtcNow;
+
+        // Any other unused link for this user is now moot.
+        await _db.EmailVerificationTokens
+            .Where(t => t.UserId == user.Id && t.UsedAt == null && t.Id != token.Id)
+            .ExecuteUpdateAsync(t => t.SetProperty(x => x.UsedAt, DateTimeOffset.UtcNow), cancellationToken);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult<AdminUserResponse>.Success(ToResponse(user));
+    }
+
+    public async Task<ServiceResult<ResendVerificationResponse>> ResendVerificationAsync(
+        ResendVerificationRequest request,
+        CancellationToken cancellationToken)
+    {
+        // Identical response on every branch — no account enumeration.
+        var response = new ResendVerificationResponse();
+
+        var email = NormaliseEmail(request.Email);
+        if (email is null)
+        {
+            return ServiceResult<ResendVerificationResponse>.Success(response);
+        }
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+        if (user is null || user.Status != UserStatus.EmailVerificationRequired)
+        {
+            return ServiceResult<ResendVerificationResponse>.Success(response);
+        }
+
+        var since = DateTimeOffset.UtcNow - ResendWindow;
+        var recentCount = await _db.EmailVerificationTokens
+            .CountAsync(t => t.UserId == user.Id && t.CreatedAt >= since, cancellationToken);
+
+        if (recentCount >= MaxResendsPerEmailPerWindow)
+        {
+            return ServiceResult<ResendVerificationResponse>.Success(response);
+        }
+
+        // Prior unused links become invalid the moment a new one is issued.
+        await _db.EmailVerificationTokens
+            .Where(t => t.UserId == user.Id && t.UsedAt == null)
+            .ExecuteUpdateAsync(t => t.SetProperty(x => x.UsedAt, DateTimeOffset.UtcNow), cancellationToken);
+
+        await IssueVerificationEmailAsync(user, cancellationToken);
+
+        return ServiceResult<ResendVerificationResponse>.Success(response);
+    }
+
+    /// <summary>
+    /// Creates and stores a verification token, then emails its link. A failed send does not fail
+    /// the caller — the account still exists and can retry via resend, so this only logs.
+    /// </summary>
+    private async Task IssueVerificationEmailAsync(User user, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var rawToken = EmailVerificationTokenGenerator.Create();
+
+        _db.EmailVerificationTokens.Add(new EmailVerificationToken
+        {
+            UserId = user.Id,
+            TokenHash = EmailVerificationTokenGenerator.Hash(rawToken),
+            ExpiresAt = now.Add(VerificationTokenLifetime),
+            CreatedAt = now
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var link = $"{_emailOptions.BaseUrl.TrimEnd('/')}/verify-email?token={rawToken}";
+
+        var sent = await _email.SendAsync(new EmailMessage
+        {
+            To = user.Email,
+            Subject = "Confirm your FrostWoodTech admin account",
+            HtmlBody =
+                $"<p>Hi {user.FirstName},</p>" +
+                $"<p>Confirm your email address to continue setting up your FrostWoodTech admin account:</p>" +
+                $"<p><a href=\"{link}\">{link}</a></p>" +
+                "<p>This link expires in 24 hours. If you didn't request this account, ignore this email.</p>",
+            TextBody =
+                $"Hi {user.FirstName},\n\n" +
+                "Confirm your email address to continue setting up your FrostWoodTech admin account:\n" +
+                $"{link}\n\n" +
+                "This link expires in 24 hours. If you didn't request this account, ignore this email."
+        }, cancellationToken);
+
+        if (!sent.IsSuccess)
+        {
+            _logger.LogWarning(
+                "Verification email to {Email} could not be sent: {Code}", user.Email, sent.Error!.Code);
+        }
+    }
+
+    public async Task<ServiceResult<ForgotPasswordResponse>> ForgotPasswordAsync(
+        ForgotPasswordRequest request,
+        string? ipAddress,
+        CancellationToken cancellationToken)
+    {
+        // Identical response on every branch — no account enumeration.
+        var response = new ForgotPasswordResponse();
+        var success = ServiceResult<ForgotPasswordResponse>.Success(response);
+
+        var email = NormaliseEmail(request.Email);
+        if (email is null)
+        {
+            return success;
+        }
+
+        if (await _rateLimiter.IsBlockedAsync(
+                email, ipAddress, AuthAttemptAction.PasswordReset, cancellationToken))
+        {
+            _logger.LogInformation("Password reset for {Email} refused: rate limited.", email);
+
+            return success;
+        }
+
+        await _rateLimiter.RecordAttemptAsync(
+            email, ipAddress, AuthAttemptAction.PasswordReset, cancellationToken);
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+
+        if (user is null)
+        {
+            _logger.LogInformation("Password reset requested for {Email}, which has no account.", email);
+
+            return success;
+        }
+
+        // Only pending/approved get a link — unverified has its own resend flow; rejected and
+        // disabled must not get a fresh credential.
+        if (user.Status is not (UserStatus.Pending or UserStatus.Approved))
+        {
+            _logger.LogInformation(
+                "Password reset for {Email} skipped: status is {Status}.", email, user.Status);
+
+            return success;
+        }
+
+        // Invalidate first, so only the newest link ever works.
+        await _db.PasswordTokens
+            .Where(t => t.UserId == user.Id
+                && t.Purpose == PasswordTokenPurpose.Reset
+                && t.UsedAt == null)
+            .ExecuteUpdateAsync(t => t.SetProperty(x => x.UsedAt, DateTimeOffset.UtcNow), cancellationToken);
+
+        var now = DateTimeOffset.UtcNow;
+        var rawToken = EmailVerificationTokenGenerator.Create();
+
+        _db.PasswordTokens.Add(new PasswordToken
+        {
+            UserId = user.Id,
+            TokenHash = EmailVerificationTokenGenerator.Hash(rawToken),
+            Purpose = PasswordTokenPurpose.Reset,
+            ExpiresAt = now.Add(ResetTokenLifetime),
+            CreatedAt = now
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var link = $"{_emailOptions.BaseUrl.TrimEnd('/')}/set-password?token={rawToken}";
+
+        var sent = await _email.SendAsync(new EmailMessage
+        {
+            To = user.Email,
+            Subject = "Reset your FrostWoodTech password",
+            HtmlBody =
+                $"<p>Hi {user.FirstName},</p>" +
+                "<p>Somebody asked to reset the password for your FrostWoodTech admin account. Choose a new one here:</p>" +
+                $"<p><a href=\"{link}\">{link}</a></p>" +
+                "<p>This link expires in 1 hour and can only be used once. Setting a new password signs you out everywhere else.</p>" +
+                "<p>If this wasn't you, ignore this email — your password has not changed.</p>",
+            TextBody =
+                $"Hi {user.FirstName},\n\n" +
+                "Somebody asked to reset the password for your FrostWoodTech admin account. Choose a new one here:\n" +
+                $"{link}\n\n" +
+                "This link expires in 1 hour and can only be used once. Setting a new password signs you out everywhere else.\n\n" +
+                "If this wasn't you, ignore this email — your password has not changed."
+        }, cancellationToken);
+
+        if (!sent.IsSuccess)
+        {
+            _logger.LogWarning(
+                "Password reset email to {Email} could not be sent: {Code}", user.Email, sent.Error!.Code);
+        }
+
+        return success;
+    }
+
+    public async Task<ServiceResult<AdminUserResponse>> SetPasswordAsync(
+        SetPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (Blank(request.Token) is not { } rawToken)
+        {
+            return ServiceResult<AdminUserResponse>.Validation("A token is required.");
+        }
+
+        var validationError = ValidatePassword(request.Password, request.ConfirmPassword, "Password");
+        if (validationError is not null)
+        {
+            return ServiceResult<AdminUserResponse>.Validation(validationError);
+        }
+
+        var hash = EmailVerificationTokenGenerator.Hash(rawToken);
+
+        var token = await _db.PasswordTokens
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken);
+
+        // Distinct codes are safe: reaching any of them already requires holding a token.
+        if (token is null)
+        {
+            _logger.LogInformation("Password link rejected: no token matches the presented value.");
+
+            return ServiceResult<AdminUserResponse>.NotFound(
+                "invalid_setup_token", "This password link is not valid.");
+        }
+
+        if (token.UsedAt is not null)
+        {
+            _logger.LogInformation(
+                "{Purpose} link for {UserId} rejected: already used at {UsedAt}.",
+                token.Purpose, token.UserId, token.UsedAt);
+
+            return ServiceResult<AdminUserResponse>.Conflict(
+                "setup_token_already_used", "This link has already been used.");
+        }
+
+        if (token.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            _logger.LogInformation(
+                "{Purpose} link for {UserId} rejected: expired at {ExpiresAt}.",
+                token.Purpose, token.UserId, token.ExpiresAt);
+
+            return ServiceResult<AdminUserResponse>.Conflict(
+                "setup_token_expired", "This link has expired.");
+        }
+
+        var user = token.User;
+
+        user.PasswordHash = PasswordHasher.Hash(request.Password!);
+        token.UsedAt = DateTimeOffset.UtcNow;
+
+        // Any other unused link for this user, of either purpose, is now a pure liability.
+        await _db.PasswordTokens
+            .Where(t => t.UserId == user.Id && t.UsedAt == null && t.Id != token.Id)
+            .ExecuteUpdateAsync(t => t.SetProperty(x => x.UsedAt, DateTimeOffset.UtcNow), cancellationToken);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        // Same as ChangePasswordAsync: a new password ends every session that predates it.
+        await RevokeAllForUserAsync(user.Id, cancellationToken);
+
+        _logger.LogInformation(
+            "{Purpose} link redeemed for {UserId}. All refresh tokens revoked.", token.Purpose, user.Id);
 
         return ServiceResult<AdminUserResponse>.Success(ToResponse(user));
     }
@@ -114,9 +436,8 @@ public class UserService : IUserService
             return ServiceResult<AuthResponse>.Validation("Email and password are required.");
         }
 
-        // Checked before the password so a blocked caller costs an index lookup rather than an
-        // Argon2 hash — otherwise the throttle is itself the cheapest way to burn the CPU.
-        if (await _rateLimiter.IsBlockedAsync(email, ipAddress, cancellationToken))
+        // Before the password check: a blocked caller shouldn't cost an Argon2 hash.
+        if (await _rateLimiter.IsBlockedAsync(email, ipAddress, AuthAttemptAction.Login, cancellationToken))
         {
             return ServiceResult<AuthResponse>.Unauthorized(
                 "too_many_attempts",
@@ -127,23 +448,31 @@ public class UserService : IUserService
 
         if (user is null)
         {
-            // Same work, same answer as a wrong password: the response must not reveal whether
-            // the account exists.
+            // Same work, same answer as a wrong password — no account enumeration.
             PasswordHasher.BurnVerifyTime(password);
-            await _rateLimiter.RecordFailureAsync(email, ipAddress, cancellationToken);
+            await _rateLimiter.RecordAttemptAsync(email, ipAddress, AuthAttemptAction.Login, cancellationToken);
+
+            return InvalidCredentials();
+        }
+
+        // No hash (Google-only, or un-redeemed super admin) — burn and fail like a wrong password.
+        if (string.IsNullOrEmpty(user.PasswordHash))
+        {
+            PasswordHasher.BurnVerifyTime(password);
+            await _rateLimiter.RecordAttemptAsync(email, ipAddress, AuthAttemptAction.Login, cancellationToken);
 
             return InvalidCredentials();
         }
 
         if (!PasswordHasher.Verify(user.PasswordHash, password))
         {
-            await _rateLimiter.RecordFailureAsync(email, ipAddress, cancellationToken);
+            await _rateLimiter.RecordAttemptAsync(email, ipAddress, AuthAttemptAction.Login, cancellationToken);
 
             return InvalidCredentials();
         }
 
-        // Checked after the password so an anonymous caller cannot probe account state.
-        // A non-approved user is rejected here at token issue rather than handed a scopeless token.
+        // After the password check, so an anonymous caller cannot probe account state.
+        // Non-approved is rejected at token issue, never handed a scopeless token.
         if (user.Status != UserStatus.Approved)
         {
             return NotApproved(user);
@@ -151,9 +480,8 @@ public class UserService : IUserService
 
         user.LastLoginAt = DateTimeOffset.UtcNow;
 
-        // A successful sign-in clears the slate, so earlier fumbled attempts do not count
-        // towards a later lockout.
-        await _rateLimiter.ClearAsync(email, cancellationToken);
+        // A successful sign-in clears earlier failed attempts, so they can't cause a later lockout.
+        await _rateLimiter.ClearAsync(email, AuthAttemptAction.Login, cancellationToken);
 
         var (response, _) = await IssueTokensAsync(user, cancellationToken);
 
@@ -177,17 +505,15 @@ public class UserService : IUserService
 
         var identity = validated.Value!;
 
-        // An unverified address is not proof of anything — matching on it would let anyone who
-        // can create a Google account with someone else's email claim their CMS user.
+        // Never match on an unverified address — anyone could claim another user's CMS account.
         if (!identity.EmailVerified)
         {
             return ServiceResult<AuthResponse>.Unauthorized(
                 "google_email_unverified", "This Google account's email address is not verified.");
         }
 
-        // Match on the subject first: it is stable, whereas an address can be reassigned.
-        // IgnoreQueryFilters so a soft-deleted account is found and refused rather than silently
-        // re-created as a brand new pending user.
+        // Subject first: it's stable, an address can be reassigned. IgnoreQueryFilters so a
+        // soft-deleted account is refused, not silently re-created as a new pending user.
         var user = await _db.Users
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(
@@ -221,8 +547,7 @@ public class UserService : IUserService
                 "account_disabled", "This account has been disabled. Contact the super admin.");
         }
 
-        // First Google sign-in for an account that registered with a password: link the two.
-        // The password still works — this adds a way in, it does not replace one.
+        // First Google sign-in on a password account: link them. The password still works.
         user.GoogleSubjectId ??= identity.Subject;
         user.AvatarUrl = identity.AvatarUrl ?? user.AvatarUrl;
 
@@ -251,8 +576,8 @@ public class UserService : IUserService
 
         var hash = RefreshTokenGenerator.Hash(presented);
 
-        // IgnoreQueryFilters so a soft-deleted owner still loads — the User navigation would
-        // otherwise come back null and the account checks below would never run.
+        // IgnoreQueryFilters so a soft-deleted owner still loads — otherwise User is null and
+        // the account checks below never run.
         var stored = await _db.RefreshTokens
             .IgnoreQueryFilters()
             .Include(t => t.User)
@@ -265,9 +590,8 @@ public class UserService : IUserService
 
         if (stored.RevokedAt is not null)
         {
-            // A revoked token coming back means it was replayed — most likely stolen, since the
-            // legitimate client would be holding its replacement. Kill the whole family rather
-            // than just this one.
+            // A replayed revoked token means theft — the real client holds its replacement.
+            // Kill the whole family, not just this one.
             await RevokeAllForUserAsync(stored.UserId, cancellationToken);
 
             return ServiceResult<AuthResponse>.Unauthorized(
@@ -281,8 +605,7 @@ public class UserService : IUserService
                 "refresh_token_expired", "This refresh token has expired. Sign in again.");
         }
 
-        // The check that bounds a revoked user's access: they cannot renew, whatever their old
-        // access token still says.
+        // What bounds a revoked user's access: they cannot renew, whatever their JWT still says.
         if (stored.User.Status != UserStatus.Approved || stored.User.IsDeleted)
         {
             await RevokeAllForUserAsync(stored.UserId, cancellationToken);
@@ -357,7 +680,9 @@ public class UserService : IUserService
             return ServiceResult<bool>.Unauthorized("unauthenticated", "This account no longer exists.");
         }
 
-        if (string.IsNullOrEmpty(request.CurrentPassword)
+        // No password means nothing to "change" — that's what the setup link is for.
+        if (string.IsNullOrEmpty(user.PasswordHash)
+            || string.IsNullOrEmpty(request.CurrentPassword)
             || !PasswordHasher.Verify(user.PasswordHash, request.CurrentPassword))
         {
             return ServiceResult<bool>.Unauthorized("invalid_credentials", "The current password is incorrect.");
@@ -427,6 +752,12 @@ public class UserService : IUserService
         }
 
         var user = loaded.Value!;
+
+        if (user.Status != UserStatus.Pending)
+        {
+            return ServiceResult<AdminUserResponse>.Conflict(
+                "user_not_pending", "Only accounts pending approval can be approved.");
+        }
 
         user.Status = UserStatus.Approved;
         user.ApprovedBy = _currentUser.UserId;
@@ -593,6 +924,8 @@ public class UserService : IUserService
     /// <summary>Shared by login and refresh, so both surfaces report account state identically.</summary>
     private static ServiceResult<AuthResponse> NotApproved(User user) => user.Status switch
     {
+        UserStatus.EmailVerificationRequired => ServiceResult<AuthResponse>.Forbidden(
+            "email_verification_required", "Please confirm your email address before signing in."),
         UserStatus.Pending => ServiceResult<AuthResponse>.Forbidden(
             "account_pending", "This account is waiting for super admin approval."),
         UserStatus.Rejected => ServiceResult<AuthResponse>.Forbidden(

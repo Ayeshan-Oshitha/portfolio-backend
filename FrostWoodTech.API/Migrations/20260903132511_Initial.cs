@@ -6,16 +6,18 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FrostWoodTech.API.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialSchema : Migration
+    public partial class Initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterDatabase()
+                .Annotation("Npgsql:Enum:auth_attempt_action", "login,password_reset")
+                .Annotation("Npgsql:Enum:password_token_purpose", "setup,reset")
                 .Annotation("Npgsql:Enum:price_type", "fixed,starting_from,hourly,monthly,custom")
                 .Annotation("Npgsql:Enum:tech_category", "frontend,backend,language,database,tool_or_platform,cloud_devops,ai_ml_dl,agentic_ai,design,other")
                 .Annotation("Npgsql:Enum:user_role", "super_admin,admin")
-                .Annotation("Npgsql:Enum:user_status", "pending,approved,rejected,disabled")
+                .Annotation("Npgsql:Enum:user_status", "email_verification_required,pending,approved,rejected,disabled")
                 .Annotation("Npgsql:PostgresExtension:citext", ",,");
 
             migrationBuilder.CreateTable(
@@ -26,8 +28,9 @@ namespace FrostWoodTech.API.Migrations
                     title = table.Column<string>(type: "text", nullable: false),
                     excerpt = table.Column<string>(type: "text", nullable: false),
                     published_date = table.Column<DateOnly>(type: "date", nullable: false),
-                    medium_url = table.Column<string>(type: "text", nullable: false),
-                    cover_image_id = table.Column<string>(type: "text", nullable: true),
+                    medium_url = table.Column<string>(type: "text", nullable: true),
+                    content_markdown = table.Column<string>(type: "text", nullable: true),
+                    cover_image_key = table.Column<string>(type: "text", nullable: true),
                     slug = table.Column<string>(type: "text", nullable: true),
                     is_published = table.Column<bool>(type: "boolean", nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -71,6 +74,21 @@ namespace FrostWoodTech.API.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "login_attempts",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    email = table.Column<string>(type: "text", nullable: false),
+                    ip_address = table.Column<string>(type: "text", nullable: true),
+                    action = table.Column<int>(type: "auth_attempt_action", nullable: false),
+                    attempted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_login_attempts", x => x.id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "projects",
                 columns: table => new
                 {
@@ -106,6 +124,31 @@ namespace FrostWoodTech.API.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "reviews",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    country = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    country_code = table.Column<string>(type: "character varying(2)", maxLength: 2, nullable: false),
+                    position = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    rating = table.Column<int>(type: "integer", nullable: false),
+                    review_text = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
+                    is_published = table.Column<bool>(type: "boolean", nullable: false),
+                    is_featured = table.Column<bool>(type: "boolean", nullable: false),
+                    sort_order = table.Column<int>(type: "integer", nullable: false),
+                    submitter_ip = table.Column<string>(type: "text", nullable: true),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_reviews", x => x.id);
+                    table.CheckConstraint("ck_reviews_rating_range", "rating BETWEEN 1 AND 5");
+                });
+
+            migrationBuilder.CreateTable(
                 name: "services",
                 columns: table => new
                 {
@@ -115,7 +158,7 @@ namespace FrostWoodTech.API.Migrations
                     short_description = table.Column<string>(type: "text", nullable: false),
                     description = table.Column<string>(type: "text", nullable: false),
                     icon_name = table.Column<string>(type: "text", nullable: true),
-                    icon_cloudinary_id = table.Column<string>(type: "text", nullable: true),
+                    icon_object_key = table.Column<string>(type: "text", nullable: true),
                     hero_image_id = table.Column<string>(type: "text", nullable: true),
                     is_published = table.Column<bool>(type: "boolean", nullable: false),
                     published_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
@@ -143,7 +186,7 @@ namespace FrostWoodTech.API.Migrations
                     slug = table.Column<string>(type: "text", nullable: false),
                     is_technology = table.Column<bool>(type: "boolean", nullable: false),
                     technology_category = table.Column<int>(type: "tech_category", nullable: true),
-                    icon_cloudinary_id = table.Column<string>(type: "text", nullable: true),
+                    icon_object_key = table.Column<string>(type: "text", nullable: true),
                     icon_url = table.Column<string>(type: "text", nullable: true),
                     color_hex = table.Column<string>(type: "text", nullable: true),
                     sort_order = table.Column<int>(type: "integer", nullable: false),
@@ -173,6 +216,7 @@ namespace FrostWoodTech.API.Migrations
                     approved_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     rejection_reason = table.Column<string>(type: "text", nullable: true),
                     last_login_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    email_verified_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     is_deleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false)
@@ -194,7 +238,7 @@ namespace FrostWoodTech.API.Migrations
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     project_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    cloudinary_id = table.Column<string>(type: "text", nullable: false),
+                    object_key = table.Column<string>(type: "text", nullable: false),
                     url = table.Column<string>(type: "text", nullable: false),
                     alt_text = table.Column<string>(type: "text", nullable: false),
                     width = table.Column<int>(type: "integer", nullable: false),
@@ -324,6 +368,51 @@ namespace FrostWoodTech.API.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "email_verification_tokens",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    token_hash = table.Column<string>(type: "text", nullable: false),
+                    expires_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    used_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_email_verification_tokens", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_email_verification_tokens_users_user_id",
+                        column: x => x.user_id,
+                        principalTable: "users",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "password_tokens",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    token_hash = table.Column<string>(type: "text", nullable: false),
+                    purpose = table.Column<int>(type: "password_token_purpose", nullable: false),
+                    expires_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    used_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_password_tokens", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_password_tokens_users_user_id",
+                        column: x => x.user_id,
+                        principalTable: "users",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "refresh_tokens",
                 columns: table => new
                 {
@@ -377,6 +466,38 @@ namespace FrostWoodTech.API.Migrations
                 table: "articles",
                 column: "slug",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_email_verification_tokens_token_hash",
+                table: "email_verification_tokens",
+                column: "token_hash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_email_verification_tokens_user_id_created_at",
+                table: "email_verification_tokens",
+                columns: new[] { "user_id", "created_at" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_login_attempts_email_action_attempted_at",
+                table: "login_attempts",
+                columns: new[] { "email", "action", "attempted_at" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_login_attempts_ip_address_action_attempted_at",
+                table: "login_attempts",
+                columns: new[] { "ip_address", "action", "attempted_at" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_password_tokens_token_hash",
+                table: "password_tokens",
+                column: "token_hash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_password_tokens_user_id_purpose_created_at",
+                table: "password_tokens",
+                columns: new[] { "user_id", "purpose", "created_at" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_pricing_plan_features_pricing_plan_id",
@@ -455,6 +576,13 @@ namespace FrostWoodTech.API.Migrations
                 table: "users",
                 column: "google_subject_id",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_users_single_super_admin",
+                table: "users",
+                column: "role",
+                unique: true,
+                filter: "\"role\" = 'super_admin'");
         }
 
         /// <inheritdoc />
@@ -464,7 +592,16 @@ namespace FrostWoodTech.API.Migrations
                 name: "article_tags");
 
             migrationBuilder.DropTable(
+                name: "email_verification_tokens");
+
+            migrationBuilder.DropTable(
                 name: "faqs");
+
+            migrationBuilder.DropTable(
+                name: "login_attempts");
+
+            migrationBuilder.DropTable(
+                name: "password_tokens");
 
             migrationBuilder.DropTable(
                 name: "pricing_plan_features");
@@ -477,6 +614,9 @@ namespace FrostWoodTech.API.Migrations
 
             migrationBuilder.DropTable(
                 name: "refresh_tokens");
+
+            migrationBuilder.DropTable(
+                name: "reviews");
 
             migrationBuilder.DropTable(
                 name: "service_features");

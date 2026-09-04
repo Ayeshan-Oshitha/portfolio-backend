@@ -5,13 +5,9 @@ namespace FrostWoodTech.API.Common;
 public static class ClientAddress
 {
     /// <summary>
-    /// The caller's address, for rate limiting.
-    /// <para>
-    /// Behind the Functions front end <c>RemoteIpAddress</c> is the load balancer, so the real
-    /// client is the first entry of <c>X-Forwarded-For</c>. That header is caller-supplied and
-    /// therefore spoofable — which is exactly why it only ever widens a limit here, never
-    /// authorises anything.
-    /// </para>
+    /// The caller's address, for rate limiting. <c>RemoteIpAddress</c> is the load balancer
+    /// behind Functions, so the real client comes from <c>X-Forwarded-For</c> — spoofable, which
+    /// is why this only ever widens a limit, never authorises anything.
     /// </summary>
     public static string? Read(HttpRequest request)
     {

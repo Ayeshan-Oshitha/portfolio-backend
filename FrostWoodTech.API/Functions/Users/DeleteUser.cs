@@ -22,7 +22,7 @@ public class DeleteUser
     /// </summary>
     [Function("DeleteUser")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "admin/users/{id:guid}")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "cms/admin/users/{id:guid}")] HttpRequest req,
         Guid id,
         CancellationToken cancellationToken)
     {

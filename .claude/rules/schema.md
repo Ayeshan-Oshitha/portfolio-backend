@@ -232,16 +232,53 @@ password_hash     text null        -- null for Google-only accounts
 google_subject_id text null unique
 avatar_url        text null
 role              user_role         -- super_admin | admin
-status            user_status       -- pending | approved | rejected | disabled
+status            user_status       -- email_verification_required | pending | approved | rejected | disabled
 approved_by       uuid null fk users
 approved_at       timestamptz null
 rejection_reason  text null
 last_login_at     timestamptz null
+email_verified_at timestamptz null  -- set once, survives a later reject/disable
 + timestamps
+```
+
+`email_verification_tokens` — mirrors `refresh_tokens`' shape (hashed, single-use, not soft
+deleted so a replayed link is still recognised):
+
+```
+id            uuid pk
+user_id       uuid fk users, cascade delete
+token_hash    text unique        -- sha-256 hex of the raw token
+expires_at    timestamptz        -- 24h from issue
+created_at    timestamptz
+used_at       timestamptz null
+```
+
+`password_tokens` — identical shape and reasoning, for the links that give an account a password:
+a first one (the seeded super admin) or a replacement (forgotten password). One table with a
+discriminator, not two — only the lifetime and email wording differ.
+
+```
+id            uuid pk
+user_id       uuid fk users, cascade delete
+token_hash    text unique             -- sha-256 hex of the raw token
+purpose       password_token_purpose  -- setup | reset
+expires_at    timestamptz             -- 24h for setup, 1h for reset
+created_at    timestamptz
+used_at       timestamptz null
+```
+
+`login_attempts` carries an `action auth_attempt_action` (`login | password_reset`) so the two
+rate-limited actions are counted independently — both indexes lead with it.
+
+`users` also carries a filtered unique index so the database itself caps the super admin at one:
+
+```sql
+create unique index ix_users_single_super_admin on users (role) where "role" = 'super_admin';
 ```
 
 Behaviour rules live in `.claude/rules/auth.md`.
 
 ## Seeding
 
-Idempotent seeder ships the super admin (from app settings) and the technology tag set.
+Idempotent seeder ships the super admin — identity only, from app settings, with a null
+`password_hash` and an emailed setup link — and the technology tag set.

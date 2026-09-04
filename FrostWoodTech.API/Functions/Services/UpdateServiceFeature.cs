@@ -25,7 +25,7 @@ public class UpdateServiceFeature
         [HttpTrigger(
             AuthorizationLevel.Anonymous,
             "put",
-            Route = "admin/services/{id:guid}/features/{featureId:guid}")] HttpRequest req,
+            Route = "cms/admin/services/{id:guid}/features/{featureId:guid}")] HttpRequest req,
         Guid id,
         Guid featureId,
         CancellationToken cancellationToken)

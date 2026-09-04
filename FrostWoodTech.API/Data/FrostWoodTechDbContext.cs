@@ -43,6 +43,10 @@ public class FrostWoodTechDbContext : DbContext
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
+
+    public DbSet<PasswordToken> PasswordTokens => Set<PasswordToken>();
+
     public DbSet<LoginAttempt> LoginAttempts => Set<LoginAttempt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -57,11 +61,12 @@ public class FrostWoodTechDbContext : DbContext
         modelBuilder.HasPostgresEnum<PriceType>(name: "price_type");
         modelBuilder.HasPostgresEnum<UserRole>(name: "user_role");
         modelBuilder.HasPostgresEnum<UserStatus>(name: "user_status");
+        modelBuilder.HasPostgresEnum<PasswordTokenPurpose>(name: "password_token_purpose");
+        modelBuilder.HasPostgresEnum<AuthAttemptAction>(name: "auth_attempt_action");
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(FrostWoodTechDbContext).Assembly);
 
-        // The audit and site visibility blocks are identical everywhere, so they are mapped
-        // once here rather than repeated in every IEntityTypeConfiguration.
+        // Mapped once here rather than repeated in every IEntityTypeConfiguration.
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             var clrType = entityType.ClrType;
@@ -74,7 +79,8 @@ public class FrostWoodTechDbContext : DbContext
                 entity.Property(nameof(AuditableEntity.UpdatedAt)).HasColumnName("updated_at");
                 entity.Property(nameof(AuditableEntity.IsDeleted)).HasColumnName("is_deleted").HasDefaultValue(false);
 
-                // Soft delete must not be forgettable on a read path.
+                // Soft delete must not be forgettable on a read path. Bypass with IgnoreQueryFilters
+                // only where a deleted row must still be found on purpose — see UserService.
                 entity.HasQueryFilter(BuildNotDeletedFilter(clrType));
             }
 

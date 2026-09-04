@@ -22,7 +22,7 @@ public class UpdateFaq
     /// <summary>A full replacement — every field is written as given.</summary>
     [Function("UpdateFaq")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "admin/faqs/{id:guid}")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "cms/admin/faqs/{id:guid}")] HttpRequest req,
         Guid id,
         CancellationToken cancellationToken)
     {

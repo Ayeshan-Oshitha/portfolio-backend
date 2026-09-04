@@ -10,11 +10,8 @@ using FrostWoodTech.API.Interfaces;
 namespace FrostWoodTech.API.Auth;
 
 /// <summary>
-/// Verifies Google ID tokens against Google's published signing keys.
-///
-/// Registered as a singleton so the <see cref="ConfigurationManager{T}"/> is shared: it fetches
-/// the discovery document once, caches the JWKS, and refreshes on its own schedule. A new
-/// instance per request would re-fetch Google's keys on every sign-in.
+/// Verifies Google ID tokens against Google's published signing keys. Registered as a singleton
+/// so the JWKS is fetched once and cached rather than re-fetched on every sign-in.
 /// </summary>
 public sealed class GoogleTokenValidator : IGoogleTokenValidator
 {

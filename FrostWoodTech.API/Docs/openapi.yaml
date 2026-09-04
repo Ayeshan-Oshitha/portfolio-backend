@@ -4,29 +4,23 @@ info:
   title: FrostWoodTech CMS API
   version: "1.0.0"
   description: |
-    One headless CMS API powering three frontends — the FrostWoodTech agency site, the
-    FrostWoodTech personal site, and the admin SPA. There are no duplicated rows per site: every visible entity
-    carries per-site visibility flags and the caller asks for the site it wants.
+    Headless CMS powering three frontends (agency site, personal site, admin SPA) from one
+    database. Entities carry per-site visibility flags instead of duplicated rows.
 
-    ## Two surfaces
+    ## Surfaces
 
-    * `/public/*` — anonymous, read-only, cacheable. Returns only published, non-deleted rows
-      that are visible on the requested site.
-    * `/admin/*` — JWT required, full CRUD, returns drafts and metadata.
+    * `/public/*` — anonymous, read-only, cacheable. Published + non-deleted rows only.
+    * `/cms/admin/*` — JWT required, full CRUD, includes drafts and metadata.
 
     ## Conventions
 
-    * `?site=` is **required** on every public endpoint with site visibility. A missing site is a
-      `400` with code `site_required` — never "return everything".
-    * Lists return `{ items, page, pageSize, total }`. `pageSize` defaults to 20 and is capped
-      at 100.
-    * Errors are RFC 7807 `application/problem+json` with a stable `code`. Match on `code`,
-      never on `detail`.
-    * Public GETs send `Cache-Control: public, max-age=300` and an `ETag`; send
-      `If-None-Match` to get a `304`. Admin responses are `Cache-Control: no-store`.
-    * Timestamps are `timestamptz`, always UTC. Enums travel as their `snake_case` names.
-
-    This document is hand-authored. When a route changes, change it here too.
+    * `?site=` is **required** on public endpoints with site visibility — missing it returns
+      `400 site_required`.
+    * Lists return `{ items, page, pageSize, total }` (`pageSize` defaults to 20, max 100).
+    * Errors are RFC 7807 `application/problem+json` — match on `code`, not `detail`.
+    * Public GETs are cacheable (`ETag` / `If-None-Match`, 5 min); admin responses are
+      `no-store`.
+    * Timestamps are UTC `timestamptz`; enums travel as `snake_case` names.
 
 servers:
   - url: http://localhost:7060/api
@@ -54,9 +48,7 @@ paths:
       tags: [ops]
       operationId: getHealth
       summary: Readiness check
-      description: |
-        Readiness, not liveness — it round-trips to Postgres. Expect roughly a second on the
-        first request after Neon has been idle; that is the documented cold start, not a failure.
+      description: Readiness check that round-trips to Postgres — first request after idle can take ~1s (cold start, not a failure).
       security: []
       responses:
         "200":
@@ -212,10 +204,7 @@ paths:
       tags: [public]
       operationId: getPublicComboPricingPlans
       summary: List combo packs
-      description: |
-        Plans with no owning service (`service_id is null`). This is a separate route rather than
-        an optional `?serviceId=`: absence of a query parameter must never silently change the
-        `where` clause.
+      description: Plans with no owning service (`service_id is null`) — a separate route so a missing query param can never silently change the filter.
       security: []
       parameters:
         - $ref: "#/components/parameters/SiteRequired"
@@ -351,9 +340,7 @@ paths:
       tags: [public]
       operationId: submitReview
       summary: Submit a review
-      description: |
-        The one anonymous public write in the API. Lands with `isPublished = false` — an admin
-        must publish it before it appears anywhere. Rate limited per IP.
+      description: The one anonymous public write in the API — lands unpublished until an admin approves it. Rate limited per IP.
       security: []
       requestBody:
         required: true
@@ -374,14 +361,12 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
 
   # ------------------------------------------------------------------------------- auth
-  /admin/auth/register:
+  /cms/admin/auth/register:
     post:
       tags: [auth]
       operationId: register
       summary: Request an admin account
-      description: |
-        Creates a `pending` account and deliberately returns no token — a super admin approves
-        first. Anonymous by design.
+      description: Creates an `email_verification_required` account and emails a verification link. No token returned — verification then super admin approval are both required before sign-in works.
       security: []
       requestBody:
         required: true
@@ -390,14 +375,114 @@ paths:
             schema: { $ref: "#/components/schemas/RegisterRequest" }
       responses:
         "201":
-          description: The pending account.
+          description: The newly created account, awaiting email verification.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AdminUserResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "409": { $ref: "#/components/responses/Conflict" }
 
-  /admin/auth/login:
+  /cms/admin/auth/verify-email:
+    post:
+      tags: [auth]
+      operationId: verifyEmail
+      summary: Confirm a registered email address
+      description: Moves a password account from `email_verification_required` to `pending`, using the token from the emailed link. Never issues a sign-in token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerifyEmailRequest" }
+      responses:
+        "200":
+          description: The account, now `pending` approval.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404":
+          description: No token matches (`invalid_verification_token`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: Already used (`verification_token_already_used`) or expired (`verification_token_expired`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /cms/admin/auth/forgot-password:
+    post:
+      tags: [auth]
+      operationId: forgotPassword
+      summary: Request a password reset link
+      description: Emails a 1h single-use reset link, invalidating any prior one. Always the same generic 200 — cannot be used to enumerate accounts. Rate limited to 3 per email and 3 per IP per 15 minutes.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ForgotPasswordRequest" }
+      responses:
+        "200":
+          description: The same generic acknowledgement in every case.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ForgotPasswordResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /cms/admin/auth/set-password:
+    post:
+      tags: [auth]
+      operationId: setPassword
+      summary: Set a password from an emailed link
+      description: Redeems a single-use password link (setup or reset, consumed identically). Invalidates any other outstanding link for the user and revokes every refresh token. Never issues a sign-in token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetPasswordRequest" }
+      responses:
+        "200":
+          description: The account, which can now sign in with the new password.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404":
+          description: No token matches (`invalid_setup_token`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: Already used (`setup_token_already_used`) or expired (`setup_token_expired`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /cms/admin/auth/resend-verification:
+    post:
+      tags: [auth]
+      operationId: resendVerification
+      summary: Resend the verification email
+      description: Always returns the same generic success regardless of `email` — prevents using this endpoint to enumerate accounts.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResendVerificationRequest" }
+      responses:
+        "202":
+          description: Generic acknowledgement.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResendVerificationResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /cms/admin/auth/login:
     post:
       tags: [auth]
       operationId: login
@@ -412,14 +497,12 @@ paths:
         "200": { $ref: "#/components/responses/Auth" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401":
-          description: |
-            Bad credentials (`invalid_credentials`), an account still awaiting approval
-            (`account_pending`), or one that was rejected or disabled.
+          description: Bad credentials, or the account is unverified, pending, rejected, or disabled — see `code`.
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
 
-  /admin/auth/google:
+  /cms/admin/auth/google:
     post:
       tags: [auth]
       operationId: googleSignIn
@@ -435,7 +518,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/auth/refresh:
+  /cms/admin/auth/refresh:
     post:
       tags: [auth]
       operationId: refresh
@@ -452,7 +535,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/auth/logout:
+  /cms/admin/auth/logout:
     post:
       tags: [auth]
       operationId: logout
@@ -467,7 +550,7 @@ paths:
         "204": { $ref: "#/components/responses/NoContent" }
         "400": { $ref: "#/components/responses/BadRequest" }
 
-  /admin/auth/me:
+  /cms/admin/auth/me:
     get:
       tags: [auth]
       operationId: getMe
@@ -480,7 +563,7 @@ paths:
               schema: { $ref: "#/components/schemas/AdminUserResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/auth/change-password:
+  /cms/admin/auth/change-password:
     post:
       tags: [auth]
       operationId: changePassword
@@ -497,7 +580,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   # ------------------------------------------------------------------------------ users
-  /admin/users:
+  /cms/admin/users:
     get:
       tags: [admin]
       operationId: getUsers
@@ -526,7 +609,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
-  /admin/users/{id}:
+  /cms/admin/users/{id}:
     delete:
       tags: [admin]
       operationId: deleteUser
@@ -539,7 +622,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/users/{id}/approve:
+  /cms/admin/users/{id}/approve:
     post:
       tags: [admin]
       operationId: approveUser
@@ -552,7 +635,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/users/{id}/reject:
+  /cms/admin/users/{id}/reject:
     post:
       tags: [admin]
       operationId: rejectUser
@@ -571,7 +654,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/users/{id}/disable:
+  /cms/admin/users/{id}/disable:
     post:
       tags: [admin]
       operationId: disableUser
@@ -585,7 +668,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # --------------------------------------------------------------------------- projects
-  /admin/projects:
+  /cms/admin/projects:
     get:
       tags: [admin]
       operationId: getAdminProjects
@@ -630,7 +713,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
 
-  /admin/projects/{id}:
+  /cms/admin/projects/{id}:
     get:
       tags: [admin]
       operationId: getAdminProjectById
@@ -668,7 +751,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/projects/{id}/publish:
+  /cms/admin/projects/{id}/publish:
     post:
       tags: [admin]
       operationId: setProjectPublished
@@ -686,7 +769,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/projects/reorder:
+  /cms/admin/projects/reorder:
     post:
       tags: [admin]
       operationId: reorderProjects
@@ -701,15 +784,12 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/projects/{id}/images:
+  /cms/admin/projects/{id}/images:
     post:
       tags: [admin]
       operationId: addProjectImage
       summary: Attach an uploaded image
-      description: |
-        Called after the browser has uploaded straight to Neon Object Storage using a presigned URL from
-        `/admin/media/presigned-upload`. Image bytes never reach this API. `altText` is required, and
-        setting `isPrimary` clears the previous primary in the same transaction.
+      description: Called after the browser uploads straight to Neon Object Storage via a presigned URL — image bytes never reach this API. `altText` is required; setting `isPrimary` clears the previous one.
       parameters: [{ $ref: "#/components/parameters/IdPath" }]
       requestBody:
         required: true
@@ -726,7 +806,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/projects/{id}/images/{imageId}:
+  /cms/admin/projects/{id}/images/{imageId}:
     put:
       tags: [admin]
       operationId: updateProjectImage
@@ -752,9 +832,7 @@ paths:
       tags: [admin]
       operationId: deleteProjectImage
       summary: Remove an image
-      description: |
-        The one hard delete that exists today. The Neon Object Storage asset is destroyed after the row is
-        committed; a failed destroy is logged, not surfaced.
+      description: The one hard delete that exists today — the Neon Object Storage asset is destroyed after the row is committed; a failed destroy is only logged.
       parameters:
         - $ref: "#/components/parameters/IdPath"
         - $ref: "#/components/parameters/ImageIdPath"
@@ -763,7 +841,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/projects/{id}/images/reorder:
+  /cms/admin/projects/{id}/images/reorder:
     post:
       tags: [admin]
       operationId: reorderProjectImages
@@ -781,7 +859,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # --------------------------------------------------------------------------- articles
-  /admin/articles:
+  /cms/admin/articles:
     get:
       tags: [admin]
       operationId: getAdminArticles
@@ -826,7 +904,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
 
-  /admin/articles/{id}:
+  /cms/admin/articles/{id}:
     get:
       tags: [admin]
       operationId: getAdminArticleById
@@ -862,7 +940,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/articles/{id}/publish:
+  /cms/admin/articles/{id}/publish:
     post:
       tags: [admin]
       operationId: setArticlePublished
@@ -879,7 +957,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/articles/reorder:
+  /cms/admin/articles/reorder:
     post:
       tags: [admin]
       operationId: reorderArticles
@@ -895,7 +973,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   # --------------------------------------------------------------------------- services
-  /admin/services:
+  /cms/admin/services:
     get:
       tags: [admin]
       operationId: getAdminServices
@@ -940,7 +1018,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
 
-  /admin/services/{id}:
+  /cms/admin/services/{id}:
     get:
       tags: [admin]
       operationId: getAdminServiceById
@@ -976,7 +1054,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/services/{id}/publish:
+  /cms/admin/services/{id}/publish:
     post:
       tags: [admin]
       operationId: setServicePublished
@@ -993,7 +1071,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/services/reorder:
+  /cms/admin/services/reorder:
     post:
       tags: [admin]
       operationId: reorderServices
@@ -1008,7 +1086,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/services/{id}/features:
+  /cms/admin/services/{id}/features:
     post:
       tags: [admin]
       operationId: addServiceFeature
@@ -1029,7 +1107,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/services/{id}/features/{featureId}:
+  /cms/admin/services/{id}/features/{featureId}:
     put:
       tags: [admin]
       operationId: updateServiceFeature
@@ -1063,7 +1141,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/services/{id}/features/reorder:
+  /cms/admin/services/{id}/features/reorder:
     post:
       tags: [admin]
       operationId: reorderServiceFeatures
@@ -1081,13 +1159,12 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ---------------------------------------------------------------------- pricing plans
-  /admin/pricing-plans:
+  /cms/admin/pricing-plans:
     get:
       tags: [admin]
       operationId: getAdminPricingPlans
       summary: List pricing plans, drafts included
-      description: |
-        `serviceId` and `comboOnly` are explicit filters; with neither, the list is everything.
+      description: "`serviceId` and `comboOnly` are explicit filters; with neither, the list is everything."
       parameters:
         - $ref: "#/components/parameters/SiteRequired"
         - name: serviceId
@@ -1136,7 +1213,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/pricing-plans/{id}:
+  /cms/admin/pricing-plans/{id}:
     get:
       tags: [admin]
       operationId: getAdminPricingPlanById
@@ -1171,7 +1248,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/pricing-plans/{id}/publish:
+  /cms/admin/pricing-plans/{id}/publish:
     post:
       tags: [admin]
       operationId: setPricingPlanPublished
@@ -1188,7 +1265,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/pricing-plans/reorder:
+  /cms/admin/pricing-plans/reorder:
     post:
       tags: [admin]
       operationId: reorderPricingPlans
@@ -1203,7 +1280,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/pricing-plans/{id}/features:
+  /cms/admin/pricing-plans/{id}/features:
     post:
       tags: [admin]
       operationId: addPricingPlanFeature
@@ -1224,7 +1301,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/pricing-plans/{id}/features/{featureId}:
+  /cms/admin/pricing-plans/{id}/features/{featureId}:
     put:
       tags: [admin]
       operationId: updatePricingPlanFeature
@@ -1258,7 +1335,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/pricing-plans/{id}/features/reorder:
+  /cms/admin/pricing-plans/{id}/features/reorder:
     post:
       tags: [admin]
       operationId: reorderPricingPlanFeatures
@@ -1276,7 +1353,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ------------------------------------------------------------------------------- faqs
-  /admin/faqs:
+  /cms/admin/faqs:
     get:
       tags: [admin]
       operationId: getAdminFaqs
@@ -1323,7 +1400,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/faqs/{id}:
+  /cms/admin/faqs/{id}:
     get:
       tags: [admin]
       operationId: getAdminFaqById
@@ -1358,7 +1435,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/faqs/reorder:
+  /cms/admin/faqs/reorder:
     post:
       tags: [admin]
       operationId: reorderFaqs
@@ -1374,7 +1451,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   # ------------------------------------------------------------------------------- reviews
-  /admin/reviews:
+  /cms/admin/reviews:
     get:
       tags: [admin]
       operationId: getAdminReviews
@@ -1424,7 +1501,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/reviews/{id}:
+  /cms/admin/reviews/{id}:
     get:
       tags: [admin]
       operationId: getAdminReviewById
@@ -1460,7 +1537,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/reviews/reorder:
+  /cms/admin/reviews/reorder:
     post:
       tags: [admin]
       operationId: reorderReviews
@@ -1477,7 +1554,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   # ------------------------------------------------------------------------------- tags
-  /admin/tags:
+  /cms/admin/tags:
     get:
       tags: [admin]
       operationId: getAdminTags
@@ -1507,9 +1584,7 @@ paths:
       tags: [admin]
       operationId: createTag
       summary: Create a tag
-      description: |
-        A technology tag (`isTechnology: true`) requires `technologyCategory` and an icon; a
-        category tag must have neither.
+      description: A technology tag requires `technologyCategory` and an icon; a category tag must have neither.
       requestBody:
         required: true
         content:
@@ -1525,7 +1600,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
 
-  /admin/tags/{id}:
+  /cms/admin/tags/{id}:
     get:
       tags: [admin]
       operationId: getAdminTagById
@@ -1564,15 +1639,12 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
 
   # ------------------------------------------------------------------------------ media
-  /admin/media/presigned-upload:
+  /cms/admin/media/presigned-upload:
     post:
       tags: [admin]
       operationId: createPresignedUpload
       summary: Presign a direct-to-Neon-Object-Storage upload
-      description: |
-        Image bytes never reach this API. The browser PUTs the file straight to Neon Object
-        Storage using the returned URL, then calls the entity's image endpoint with the
-        `objectKey`, dimensions and alt text.
+      description: Image bytes never reach this API — the browser PUTs straight to Neon Object Storage with the returned URL, then the entity's image endpoint is called with `objectKey`, dimensions and alt text.
 
         The client sends a `target` rather than a folder path, so a stolen admin token cannot
         write anywhere else in the bucket. `slug` is required when the target is `projects` or
@@ -1597,10 +1669,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: |
-        The `accessToken` from `/admin/auth/login`, `/admin/auth/google` or `/admin/auth/refresh`,
-        sent as `Authorization: Bearer <token>`. Validated in middleware for everything under
-        `/admin/*` except the register, login, google, refresh and logout routes.
+      description: "The `accessToken` from login/google/refresh, sent as `Authorization: Bearer <token>`. Required on all `/cms/admin/*` routes except register, login, google, refresh and logout."
 
   headers:
     ETag:
@@ -1615,10 +1684,7 @@ components:
       name: site
       in: query
       required: true
-      description: |
-        Which frontend is asking. Required — a missing site is a `400` with code `site_required`,
-        never "return everything". This is the guard that stops personal content appearing on the
-        agency site.
+      description: "Which frontend is asking. Required — missing it is `400 site_required`, never \"return everything\"."
       schema: { $ref: "#/components/schemas/Site" }
     Page:
       name: page
@@ -1690,8 +1756,7 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     SiteRequired:
-      description: |
-        `?site=` was missing (`site_required`) or was not a known site (`validation_failed`).
+      description: "`?site=` was missing (`site_required`) or invalid (`validation_failed`)."
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -1711,8 +1776,7 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     Conflict:
-      description: |
-        The change collides with existing data — `slug_taken`, `tag_in_use`, `email_taken`.
+      description: "The change collides with existing data — `slug_taken`, `tag_in_use`, `email_taken`."
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -1851,7 +1915,7 @@ components:
       enum: [super_admin, admin]
     UserStatus:
       type: string
-      enum: [pending, approved, rejected, disabled]
+      enum: [email_verification_required, pending, approved, rejected, disabled]
     MediaTarget:
       type: string
       enum: [projects, services, tags, articles]
@@ -1859,8 +1923,7 @@ components:
     # -------------------------------------------------------------------------- envelope
     Problem:
       type: object
-      description: |
-        RFC 7807. Switch on `code`, which is stable; `detail` is human-readable and may change.
+      description: "RFC 7807. Switch on `code` (stable) — `detail` is human-readable and may change."
       properties:
         type: { type: string }
         title: { type: string, examples: ["Bad Request"] }
@@ -1868,9 +1931,7 @@ components:
         detail: { type: string }
         code:
           type: string
-          description: |
-            Stable machine-readable code — `site_required`, `validation_failed`, `slug_taken`,
-            `tag_in_use`, `account_pending`, `invalid_credentials`, and so on.
+          description: "Stable machine-readable code, e.g. `site_required`, `validation_failed`, `slug_taken`, `tag_in_use`."
           examples: [site_required]
       required: [status, title, code]
 
@@ -1904,9 +1965,7 @@ components:
 
     ProjectImageResponse:
       type: object
-      description: |
-        The API stores the Neon Object Storage `objectKey` plus dimensions and alt text — never
-        image bytes.
+      description: "The API stores the Neon Object Storage `objectKey` plus dimensions and alt text — never image bytes."
       properties:
         id: { type: string, format: uuid }
         objectKey: { type: string, examples: ["frostwoodtech/projects/acme-site/hero"] }
@@ -2109,9 +2168,7 @@ components:
     # ------------------------------------------------------------------- shared fragments
     SiteVisibility:
       type: object
-      description: |
-        Per-site visibility, the reason there is one row per entity rather than one per site.
-        `featuredOn*` requires the matching `showOn*`.
+      description: "Per-site visibility — why there's one row per entity, not one per site. `featuredOn*` requires the matching `showOn*`."
       properties:
         showOnAgency: { type: boolean, default: false }
         featuredOnAgency: { type: boolean, default: false }
@@ -2140,6 +2197,7 @@ components:
         lastLoginAt: { type: [string, "null"], format: date-time }
         approvedAt: { type: [string, "null"], format: date-time }
         rejectionReason: { type: [string, "null"] }
+        emailVerifiedAt: { type: [string, "null"], format: date-time }
         createdAt: { type: string, format: date-time }
       required: [id, email, firstName, lastName, role, status, createdAt]
 
@@ -2309,6 +2367,43 @@ components:
         confirmPassword: { type: string, format: password }
       required: [firstName, lastName, email, password, confirmPassword]
 
+    VerifyEmailRequest:
+      type: object
+      properties:
+        token: { type: string }
+      required: [token]
+
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email: { type: string, format: email }
+      required: [email]
+
+    ForgotPasswordResponse:
+      type: object
+      properties:
+        message: { type: string }
+
+    SetPasswordRequest:
+      type: object
+      properties:
+        token: { type: string }
+        password: { type: string, minLength: 8 }
+        confirmPassword: { type: string }
+      required: [token, password, confirmPassword]
+
+    ResendVerificationRequest:
+      type: object
+      properties:
+        email: { type: string, format: email }
+      required: [email]
+
+    ResendVerificationResponse:
+      type: object
+      properties:
+        message: { type: string }
+      required: [message]
+
     LoginRequest:
       type: object
       properties:
@@ -2375,9 +2470,7 @@ components:
 
     ChildReorderRequest:
       type: object
-      description: |
-        Reordering a parent's children — images or features. No `site`: children are not
-        site-scoped.
+      description: "Reordering a parent's children — images or features. No `site`: children aren't site-scoped."
       properties:
         items:
           type: array
@@ -2395,9 +2488,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/SiteVisibility"
         - type: object
-          description: |
-            Also used for `PUT` — an update is a full replacement. Omit `slug` to have one
-            generated from the title; a published project's slug should stay put.
+          description: "Also used for `PUT` (full replacement). Omit `slug` to generate one from the title — a published project's slug should stay put."
           properties:
             title: { type: string }
             slug: { type: string }
@@ -2438,7 +2529,7 @@ components:
               description: >
                 Raw Markdown. Embed media with a media://articles/... reference (e.g.
                 media://articles/images/example.png) instead of a real URL — insert the
-                reference after uploading via POST /admin/media/presigned-upload.
+                reference after uploading via POST /cms/admin/media/presigned-upload.
             isPublished: { type: boolean, default: false }
             tagIds:
               type: array
@@ -2525,9 +2616,7 @@ components:
 
     CreateReviewRequest:
       type: object
-      description: |
-        Also used for `PUT` — an update is a full replacement. For an admin manually adding a
-        testimonial collected elsewhere; not what the public submission endpoint uses.
+      description: "Also used for `PUT` (full replacement). For an admin manually adding a testimonial collected elsewhere — not what the public submission endpoint uses."
       properties:
         name: { type: string }
         country: { type: string }
@@ -2542,9 +2631,7 @@ components:
 
     CreateTagRequest:
       type: object
-      description: |
-        Also used for `PUT`. A technology tag requires `technologyCategory` and an icon; a
-        category tag must have neither.
+      description: "Also used for `PUT`. A technology tag requires `technologyCategory` and an icon; a category tag must have neither."
       properties:
         name: { type: string }
         slug: { type: string }
@@ -2558,9 +2645,7 @@ components:
 
     AddProjectImageRequest:
       type: object
-      description: |
-        Also used for `PUT`. Sent after the browser has uploaded to Neon Object Storage — the API stores
-        the `objectKey`, dimensions and alt text, never the bytes.
+      description: "Also used for `PUT`. Sent after the browser uploads to Neon Object Storage — the API stores `objectKey`, dimensions and alt text, never the bytes."
       properties:
         objectKey: { type: string }
         url: { type: string, format: uri }
@@ -2601,9 +2686,7 @@ components:
         target: { $ref: "#/components/schemas/MediaTarget" }
         slug:
           type: string
-          description: |
-            Required when `target` is `projects` or `articles`. Re-slugged server-side, so
-            nothing outside the base folder is reachable.
+          description: Required when `target` is `projects` or `articles`. Re-slugged server-side, so nothing outside the base folder is reachable.
         objectKey:
           type: string
           description: Overwrite a specific object instead of creating a new one.
@@ -2615,5 +2698,9 @@ components:
       properties:
         uploadUrl: { type: string, format: uri }
         objectKey: { type: string, examples: ["frostwoodtech/projects/acme-site/hero"] }
+        publicUrl:
+          type: string
+          format: uri
+          description: Where the object is readable once the PUT completes — the endpoint and bucket live only in server config, so the caller cannot build this itself.
         expiresAt: { type: string, format: date-time }
-      required: [uploadUrl, objectKey, expiresAt]
+      required: [uploadUrl, objectKey, publicUrl, expiresAt]

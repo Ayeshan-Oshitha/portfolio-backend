@@ -1,9 +1,11 @@
+using FrostWoodTech.API.Configuration;
+using FrostWoodTech.API.Enums;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 
 using Npgsql;
-
-using FrostWoodTech.API.Enums;
 
 namespace FrostWoodTech.API.Data;
 
@@ -15,9 +17,16 @@ public class FrostWoodTechDbContextDesignTimeFactory : IDesignTimeDbContextFacto
 {
     public FrostWoodTechDbContext CreateDbContext(string[] args)
     {
-        // Only used to build the model; `dotnet ef database update` needs a real value here.
-        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Default")
-            ?? "Host=localhost;Database=frostwoodtech;Username=postgres;Password=postgres";
+        var configuration = ConfigurationHelper.Build();
+
+        var connectionString =
+            configuration.GetConnectionString("Default")
+            ?? throw new InvalidOperationException(
+                "ConnectionStrings:Default was not configured.");
+
+        Console.WriteLine($"Environment - DesignTimeFactory: {Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")}");
+        Console.WriteLine(
+            $"Connection String - DesignTimeFactory: {configuration.GetConnectionString("Default")}");
 
         var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
         dataSourceBuilder.MapEnum<TechCategory>("tech_category");

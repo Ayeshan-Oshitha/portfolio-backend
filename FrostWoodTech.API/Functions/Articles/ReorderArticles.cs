@@ -22,7 +22,7 @@ public class ReorderArticles
     /// <summary>Bulk sort_order update for one site, in a single save.</summary>
     [Function("ReorderArticles")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/articles/reorder")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "cms/admin/articles/reorder")] HttpRequest req,
         CancellationToken cancellationToken)
     {
         HttpResponses.MarkNoStore(req);

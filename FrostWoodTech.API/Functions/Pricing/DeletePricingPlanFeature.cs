@@ -22,7 +22,7 @@ public class DeletePricingPlanFeature
         [HttpTrigger(
             AuthorizationLevel.Anonymous,
             "delete",
-            Route = "admin/pricing-plans/{id:guid}/features/{featureId:guid}")] HttpRequest req,
+            Route = "cms/admin/pricing-plans/{id:guid}/features/{featureId:guid}")] HttpRequest req,
         Guid id,
         Guid featureId,
         CancellationToken cancellationToken)

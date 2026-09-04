@@ -8,12 +8,8 @@ using FrostWoodTech.API.Common;
 namespace FrostWoodTech.API.Middleware;
 
 /// <summary>
-/// The backstop that keeps the RFC 7807 contract honest. Functions handle the failures they can
-/// name — a bad body, a missing row — but an unexpected throw (a Neon timeout, a Neon Object Storage
-/// call that fell over) would otherwise reach the host and come back as a bare 500 with no body,
-/// which the frontends cannot switch on.
-///
-/// Registered first so it wraps the auth middleware as well as the functions themselves.
+/// Backstop that keeps the RFC 7807 contract honest for unexpected throws (a bare 500 otherwise
+/// has no body to switch on). Registered first so it wraps the auth middleware too.
 /// </summary>
 public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
 {
@@ -58,8 +54,8 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
                 throw;
             }
 
-            // The detail is deliberately generic: an exception message can carry a connection
-            // string or a row's contents. The invocation id is what ties this to the log entry.
+            // Deliberately generic: an exception message can leak a connection string or row data.
+            // The invocation id ties this to the log entry.
             await ProblemResults.WriteAsync(
                 httpContext.Response,
                 StatusCodes.Status500InternalServerError,

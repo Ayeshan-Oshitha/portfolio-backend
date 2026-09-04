@@ -58,28 +58,32 @@ per IP (see `.claude/rules/auth.md`) and never returns the full row, just an id.
 ## Admin (JWT required)
 
 ```
-POST   /api/admin/auth/login            # email + password
-POST   /api/admin/auth/google           # Google ID token exchange
-POST   /api/admin/auth/register
-POST   /api/admin/auth/refresh         # body { refreshToken }, rotates
-POST   /api/admin/auth/logout          # body { refreshToken }, revokes it
+POST   /api/cms/admin/auth/login            # email + password
+POST   /api/cms/admin/auth/google           # Google ID token exchange
+POST   /api/cms/admin/auth/register
+POST   /api/cms/admin/auth/verify-email          # body { token }, moves email_verification_required -> pending
+POST   /api/cms/admin/auth/resend-verification   # body { email }, always returns the same generic response
+POST   /api/cms/admin/auth/forgot-password  # body { email }, always returns the same generic response
+POST   /api/cms/admin/auth/set-password     # body { token, password, confirmPassword }, single-use link
+POST   /api/cms/admin/auth/refresh         # body { refreshToken }, rotates
+POST   /api/cms/admin/auth/logout          # body { refreshToken }, revokes it
 
-GET    /api/admin/users                 # super_admin only, ?search= &status=
-POST   /api/admin/users/{id}/approve    # super_admin only
-POST   /api/admin/users/{id}/reject     # super_admin only, body { reason }
-POST   /api/admin/users/{id}/disable    # super_admin only
-DELETE /api/admin/users/{id}            # super_admin only, soft delete
+GET    /api/cms/admin/users                 # super_admin only, ?search= &status=
+POST   /api/cms/admin/users/{id}/approve    # super_admin only
+POST   /api/cms/admin/users/{id}/reject     # super_admin only, body { reason }
+POST   /api/cms/admin/users/{id}/disable    # super_admin only
+DELETE /api/cms/admin/users/{id}            # super_admin only, soft delete
 
-CRUD   /api/admin/projects              # + /{id}/images, /{id}/images/reorder
-CRUD   /api/admin/articles
-CRUD   /api/admin/services              # + /{id}/features
-CRUD   /api/admin/pricing-plans
-CRUD   /api/admin/faqs
-CRUD   /api/admin/tags
-CRUD   /api/admin/reviews               # + /reorder — publish/unpublish/featured all via PUT
+CRUD   /api/cms/admin/projects              # + /{id}/images, /{id}/images/reorder
+CRUD   /api/cms/admin/articles
+CRUD   /api/cms/admin/services              # + /{id}/features
+CRUD   /api/cms/admin/pricing-plans
+CRUD   /api/cms/admin/faqs
+CRUD   /api/cms/admin/tags
+CRUD   /api/cms/admin/reviews               # + /reorder — publish/unpublish/featured all via PUT
 
-POST   /api/admin/media/presigned-upload # Neon Object Storage presigned PUT URL
-POST   /api/admin/{entity}/reorder      # bulk sort_order update
+POST   /api/cms/admin/media/presigned-upload # Neon Object Storage presigned PUT URL
+POST   /api/cms/admin/{entity}/reorder      # bulk sort_order update
 ```
 
 Admin endpoints return drafts and metadata. Use admin-specific DTOs — never reuse the public

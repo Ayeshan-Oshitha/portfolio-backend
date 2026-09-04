@@ -31,8 +31,7 @@ public class ArticleService : IArticleService
         int pageSize,
         CancellationToken cancellationToken)
     {
-        // is_deleted is handled by the DbContext's global filter; is_published and the site flag
-        // are applied here and are not optional.
+        // is_deleted comes from the global query filter; is_published and the site flag are not optional.
         var query = ForSite(_db.Articles.AsNoTracking().Where(a => a.IsPublished), site);
 
         if (tagSlug is not null)
@@ -197,8 +196,7 @@ public class ArticleService : IArticleService
         _db.Articles.Add(article);
         await _db.SaveChangesAsync(cancellationToken);
 
-        // Re-read rather than project the in-memory entity: the links were added by tag id, so
-        // their Tag navigations are not loaded yet.
+        // Re-read: links were added by tag id, so their Tag navigations are not loaded yet.
         return await GetByIdAsync(article.Id, cancellationToken);
     }
 
